@@ -1,0 +1,18 @@
+# Dependencies are installed inside the image with npm ci.
+node_modules/
+
+# Keep local configuration and repository metadata out of the image.
+.env
+.env.*
+.git/
+**/.git/
+
+# Exclude test, documentation, and generated project artifacts.
+test/
+coverage/
+PixelVault/
+logs/
+application/logs/
+*.log
+npm-debug.log*
+
