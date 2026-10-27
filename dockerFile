@@ -33,7 +33,7 @@ RUN mkdir -p /app/logs
 # 4000, 4001, 4002, 4003 -> Express replicas
 # 8000              -> Reverse proxy
 # ---------------------------------------------------------
-EXPOSE 4000 4001 4002 4003 8000
+EXPOSE 4002 4003 8001
 
 # ---------------------------------------------------------
 # Make startup script executable
@@ -45,5 +45,6 @@ RUN chmod +x app.process.sh
 # ---------------------------------------------------------
 CMD ["./app.process.sh"]
 
-# docker build -f dockerFile -t node-proxy-app:0.0.1 .
-# docker --name node-proxy-app run --rm  -p 8000:8000 -p 4000:4000 -p 4001:4001 -p 4002:4002 -p 4003:4003  node-proxy-app:0.0.1
+# docker buildx build --platform linux/arm64 -f dockerFile -t bhandekunal16/cdn-byte-server:0.0.1-arm64 --push .
+
+# sudo docker run -d   --name cdn-byte-server   --restart unless-stopped   -p 8001:8001 bhandekunal16/cdn-byte-server:0.0.1-arm64
