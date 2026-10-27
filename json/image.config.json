@@ -1,0 +1,46 @@
+{
+  "MAX_DIMENSION": 1600,
+  "QUALITY": 78,
+  "EFFORT": 4,
+  "MONGO_IMAGE_MAX_BYTES": 10485760,
+  "IMAGE_MIME_TYPES": {
+    "jpeg": "image/jpeg",
+    "png": "image/png",
+    "webp": "image/webp",
+    "avif": "image/avif"
+  },
+  "IMAGE_ENCODER_CONFIG": {
+    "limitInputPixels": 100000000,
+    "DEFAULT_FORMAT": "webp",
+    "DEFAULT_QUALITY": 80,
+    "failOn": "error"
+  },
+  "IMAGE_STORAGE": {
+    "MAX_DIMENSION": 1600,
+    "QUALITY": 78,
+    "EFFORT": 4,
+    "MONGO_IMAGE_MAX_BYTES": 10485760
+  },
+  "IMAGE_CONFIG": {
+    "UPLOAD_ERRORS": {
+      "required": "Image is required",
+      "not_valid": "A valid Gmail address is required",
+      "size_exceed": "Image exceeds the configured size limit",
+      "unsupported": "Invalid or unsupported image",
+      "not_be_stored": "Image could not be stored",
+      "email_OR_id_missing": "Provide either email or id, but not both",
+      "invalid_gmail": "A valid Gmail address is required",
+      "failed_to_fetch": "Failed to fetch images",
+      "invalid_id": "Invalid image ID",
+      "id_required": "At least one valid image ID is required"
+    },
+    "IMAGE_STATE": {
+      "not_found": "Image not found",
+      "uploaded": "Image uploaded",
+      "upload_failed": "Image upload failed",
+      "found": "Images found!",
+      "deleted": "Images deleted successfully",
+      "failed_to_delete": "Failed to delete images"
+    }
+  }
+}

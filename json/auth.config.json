@@ -1,0 +1,28 @@
+{
+  "LOGIN_CONFIG": {
+    "title": "Log in | Image Store",
+    "description": "Log in to your Image Store account.",
+    "LOGIN_ERROR": {
+      "field_require": "Email and password are required",
+      "invalid": "Invalid email or password"
+    },
+    "LOGIN_STATUS": {
+      "failed": "login failed",
+      "success": "successfully login!"
+    }
+  },
+  "REGISTER_CONFIG": {
+    "title": "Create account | Image Store",
+    "description": "Create your Image Store account.",
+    "REGISTER_ERROR": {
+      "not_unique": "Only Gmail addresses are allowed",
+      "invalid_length": "Password must be at least 8 characters",
+      "already_exits": "Email is already registered",
+      "field_require": "Email and password are required"
+    },
+    "REGISTER_STATUS": {
+      "failed": "registration failed!",
+      "success": "registration done successfully"
+    }
+  }
+}

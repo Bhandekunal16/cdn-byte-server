@@ -1,0 +1,28 @@
+{
+  "mongodb": {
+    "MONGODB_USERNAME": "roboticdev07_db_user",
+    "MONGODB_PASSWORD": "Z0vh0aFpkKDPz7rd",
+    "MONGODB_URI": "mongodb+srv://roboticdev07_db_user:Z0vh0aFpkKDPz7rd@cluster0.url0tg7.mongodb.net",
+    "MONGO_CONFIG": {
+      "maxPoolSize": 20,
+      "minPoolSize": 2,
+      "connectTimeoutMS": 10000,
+      "serverSelectionTimeoutMS": 10000,
+      "retryReads": true,
+      "retryWrites": true,
+      "tls": true
+    },
+    "DATABASE_NAME": "store",
+    "DATABASE_COLLECTION": {
+      "IMAGES": "images"
+    }
+  },
+  "neo4j": {
+    "NEO4J_URI": "neo4j+s://de16b99a.databases.neo4j.io",
+    "NEO4J_USERNAME": "de16b99a",
+    "NEO4J_PASSWORD": "ulnQ532DJmggf99inx9mGXuoZi50zEWMDWaDTlv4jmE",
+    "NEO4J_DATABASE": "de16b99a",
+    "AURA_INSTANCEID": "de16b99a",
+    "AURA_INSTANCENAME": "CDN_DB"
+  }
+}
