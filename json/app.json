@@ -1,7 +1,7 @@
 {
   "host": "0.0.0.0",
-  "port": 4000,
-  "proxyPort": 8000,
+  "port": 4002,
+  "proxyPort": 8001,
   "PROXY_TIMEOUT": 30000,
   "HEADERS_TIMEOUT": 10000,
   "KEEP_ALIVE_TIMEOUT": 5000,
