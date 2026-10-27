@@ -2,7 +2,7 @@ const ImageCodec = require("../service/image.service");
 const decodeBase64Image = require("../service/base64.service");
 const { UnifiedResponse } = require("../core/unified-response");
 const { storageService } = require("../service/storage.service");
-const { gmailRegex } = require("../enums/regex.enums");
+const { validateEmail } = require("../enums/regex.enums");
 const { ObjectId, multer } = require("../provider/dependency.map");
 const { IMAGE_STORAGE, IMAGE_CONFIG } = require("../provider/config.map");
 
@@ -48,7 +48,7 @@ module.exports = function storageRoutes(app) {
           .json(new UnifiedResponse(required, 400, false, {}));
       }
 
-      if (typeof email !== "string" || !gmailRegex.test(email.trim())) {
+      if (typeof email !== "string" || !validateEmail(email.trim())) {
         return res
           .status(400)
           .json(new UnifiedResponse(not_valid, 400, false, {}));
@@ -146,7 +146,7 @@ module.exports = function storageRoutes(app) {
     }
   });
 
-  app.get("/image", async (req, res) => {
+  app.get("/image", async (req, res, next) => {
     try {
       const email =
         typeof req.query.email === "string"
@@ -162,7 +162,7 @@ module.exports = function storageRoutes(app) {
           .json(new UnifiedResponse(email_OR_id_missing, 400, false, []));
       }
 
-      if (email && !gmailRegex.test(email)) {
+      if (email && !validateEmail(email)) {
         return res
           .status(400)
           .json(new UnifiedResponse(invalid_gmail, 400, false, []));
@@ -209,7 +209,11 @@ module.exports = function storageRoutes(app) {
             images,
           ),
         );
-    } catch {
+    } catch (error) {
+      if (res.headersSent) {
+        return next(error);
+      }
+
       return res
         .status(500)
         .json(new UnifiedResponse(failed_to_fetch, 500, false, []));

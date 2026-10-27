@@ -13,7 +13,23 @@ describe("interceptors/error.interceptor.js", () => {
     expect(res.json).toHaveBeenCalledWith({
       message: "boom",
       status: false,
-      statusCode: 500,
+      statusCode: 404,
     });
+  });
+
+  it("passes errors onward when response headers have already been sent", () => {
+    const error = new Error("stream failed");
+    const next = jest.fn();
+    const res = {
+      headersSent: true,
+      status: jest.fn(),
+      json: jest.fn(),
+    };
+
+    errorInterceptor(error, {}, res, next);
+
+    expect(next).toHaveBeenCalledWith(error);
+    expect(res.status).not.toHaveBeenCalled();
+    expect(res.json).not.toHaveBeenCalled();
   });
 });
