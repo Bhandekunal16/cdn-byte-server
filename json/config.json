@@ -1,6 +1,6 @@
 {
   "errorInterceptor": true,
-  "encryption_Interceptor": true,
+  "encryption_Interceptor": false,
   "logger_interceptor": true,
   "response_interceptor": true,
   "clustering": true,

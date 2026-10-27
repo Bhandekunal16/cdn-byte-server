@@ -40,22 +40,27 @@ async function register(email, password) {
 }
 
 async function login(email, password) {
-  email = normalizeEmail(email);
+  try {
+    email = normalizeEmail(email);
 
-  const result = await neo4jDriver.executeQuery(
-    ` MATCH (u:User {email: $email})
+    const result = await neo4jDriver.executeQuery(
+      ` MATCH (u:User {email: $email})
       RETURN u {.id, .email, .passwordHash, .role } AS user
       LIMIT 1`,
-    { email },
-    { database },
-  );
+      { email },
+      { database },
+    );
 
-  if (result.records.length === 0) throw new Error(LOGIN_ERROR.invalid);
-  const { passwordHash, id, ...user } = result.records[0].get("user");
-  const validPassword = await bcrypt.compare(password, passwordHash);
 
-  if (!validPassword) throw new Error(LOGIN_ERROR.invalid);
-  return { id, email: user.email, role: user.role };
+    if (result.records.length === 0) throw new Error(LOGIN_ERROR.invalid);
+    const { passwordHash, id, ...user } = result.records[0].get("user");
+    const validPassword = await bcrypt.compare(password, passwordHash);
+
+    if (!validPassword) throw new Error(LOGIN_ERROR.invalid);
+    return { id, email: user.email, role: user.role };
+  } catch (error) {
+    throw new Error(error.message);
+  }
 }
 
 module.exports = { login, register };
