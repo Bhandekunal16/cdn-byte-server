@@ -39,25 +39,22 @@ module.exports = function storageRoutes(app) {
       const imageBase64 = req.body?.image;
       const email = req.body?.email;
 
-      if (!imageFile && typeof imageBase64 !== "string") {
+      if (!imageFile && typeof imageBase64 !== "string")
         return res
           .status(400)
           .json(new UnifiedResponse(required, 400, false, {}));
-      }
 
-      if (typeof email !== "string" || !validateEmail(email.trim())) {
+      if (typeof email !== "string" || !validateEmail(email.trim()))
         return res
           .status(400)
           .json(new UnifiedResponse(not_valid, 400, false, {}));
-      }
 
       const name = imageFile?.originalname || "uploaded-image";
 
-      if (imageFile && imageFile.size > MONGO_IMAGE_MAX_BYTES) {
+      if (imageFile && imageFile.size > MONGO_IMAGE_MAX_BYTES)
         return res
           .status(413)
           .json(new UnifiedResponse(size_exceed, 413, false, {}));
-      }
 
       const decoded = imageFile
         ? {
