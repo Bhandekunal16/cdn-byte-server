@@ -3,8 +3,6 @@ const { neo4jDriver } = require("../database/neo4j.service");
 const {
   normalizeEmail,
   validateEmail,
-  loginQuery,
-  registerQuery,
 } = require("../enums/regex.enums");
 const {
   neo4j,
@@ -27,7 +25,9 @@ async function register(email, password) {
 
   try {
     const result = await neo4jDriver.executeQuery(
-      registerQuery,
+       `CREATE ( u:User { id: randomUUID(), email: $email, passwordHash: $passwordHash, createdAt: datetime(), updatedAt: datetime(), role : "user"})
+      RETURN u {.id, .email, .createdAt, .role } AS user
+      `,
       { email, passwordHash },
       { database },
     );
@@ -44,13 +44,13 @@ async function register(email, password) {
 async function login(email, password) {
   try {
     email = normalizeEmail(email);
-
     const result = await neo4jDriver.executeQuery(
-      loginQuery,
+       `MATCH (u:User {email: $email})
+      RETURN u {.id, .email, .passwordHash, .role } AS user
+      LIMIT 1`,
       { email },
       { database },
     );
-
     if (result.records.length === 0) throw new Error(LOGIN_ERROR.invalid);
     const { passwordHash, id, ...user } = result.records[0].get("user");
     const validPassword = await bcrypt.compare(password, passwordHash);
