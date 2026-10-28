@@ -3,13 +3,12 @@ const {
   base64Service,
   imageServiceInstance,
   storageServiceInstance,
-  UnifiedResponse,
-  httpResponse,
   ok,
   failed,
 } = require("../provider/service.map");
 const { ObjectId, multer } = require("../provider/dependency.map");
 const { IMAGE_STORAGE, IMAGE_CONFIG } = require("../provider/config.map");
+const {httpResponse} = require("../core/unified-response.js")
 
 const upload = multer({
   storage: multer.memoryStorage(),
