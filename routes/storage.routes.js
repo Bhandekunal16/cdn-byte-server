@@ -1,13 +1,15 @@
-const ImageCodec = require("../service/image.service");
-const decodeBase64Image = require("../service/base64.service");
-const UnifiedResponse = require("../core/unified-response");
-const storageService = require("../service/storage.service");
+const {
+  storageService,
+  base64Service,
+  imageService,
+} = require("../provider/service.map");
 const { validateEmail } = require("../enums/regex.enums");
+const UnifiedResponse = require("../core/unified-response");
 const { ObjectId, multer } = require("../provider/dependency.map");
 const { IMAGE_STORAGE, IMAGE_CONFIG } = require("../provider/config.map");
 
-const codec = new ImageCodec();
-const imageService = new storageService();
+const codec = new imageService();
+const StorageService = new storageService();
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -67,7 +69,7 @@ module.exports = function storageRoutes(app) {
             buffer: imageFile.buffer,
             declaredMimeType: imageFile.mimetype,
           }
-        : decodeBase64Image(imageBase64, MONGO_IMAGE_MAX_BYTES);
+        : base64Service(imageBase64, MONGO_IMAGE_MAX_BYTES);
 
       if (decoded.buffer.length > MONGO_IMAGE_MAX_BYTES) {
         return res
@@ -96,7 +98,7 @@ module.exports = function storageRoutes(app) {
       let inserted;
 
       try {
-        inserted = await imageService.insert({
+        inserted = await StorageService.insert({
           encoded,
           email: email.trim().toLowerCase(),
           name,
@@ -175,7 +177,7 @@ module.exports = function storageRoutes(app) {
       }
 
       if (id) {
-        const result = await imageService.readImage(new ObjectId(id));
+        const result = await StorageService.readImage(new ObjectId(id));
 
         if (!result) {
           return res
@@ -196,7 +198,7 @@ module.exports = function storageRoutes(app) {
           .send(result.buffer);
       }
 
-      const images = await imageService.getImageMetaData(email);
+      const images = await StorageService.getImageMetaData(email);
       const success = images.length > 0;
 
       return res
@@ -242,7 +244,7 @@ module.exports = function storageRoutes(app) {
         objectIds.push(new ObjectId(id));
       }
 
-      const { deletedCount } = await imageService.delete(objectIds);
+      const { deletedCount } = await StorageService.delete(objectIds);
 
       if (deletedCount === 0) {
         return res
