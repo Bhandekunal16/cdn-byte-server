@@ -6,7 +6,7 @@ const environment = {
   logger: require("../json/logger.config.json"),
   database: require("../json/database.config.json"),
   imageStore: require("../json/image.config.json"),
-  authConfig: require("../json/auth.config.json"),
+  authConfig: require("../json/auth.config.json")
 };
 
 module.exports = {

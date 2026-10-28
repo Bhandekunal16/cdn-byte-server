@@ -1,29 +1,30 @@
-const { login, register, UnifiedResponse } = require("../provider/service.map");
+const { login, register, httpResponse } = require("../provider/service.map");
 
 module.exports = function userRoutes(app) {
   app.post("/login", async (req, res) => {
     try {
       const { email, password } = req.body || {};
 
-      if (!email || !password) {
-        res.status(400).json(
-          new UnifiedResponse("Required fields are missing", 400, false, {
-            error: "email and password are required",
-          }),
-        );
-      }
+      if (!email || !password)
+        return httpResponse(res, 400, {
+          msg: "Required fields are missing",
+          status: false,
+          data: { error: "email and password are required" },
+        });
 
       const user = await login(email, password);
 
-      res
-        .status(200)
-        .json(new UnifiedResponse("Login successful", 200, true, { user }));
+      return httpResponse(res, 200, {
+        msg: "Login successful",
+        status: true,
+        data: { user },
+      });
     } catch (error) {
-      return res.status(500).json(
-        new UnifiedResponse("Login failed", 500, false, {
-          error: error.message,
-        }),
-      );
+      return httpResponse(res, 500, {
+        msg: "Login failed",
+        status: false,
+        data: error.message,
+      });
     }
   });
 
@@ -31,27 +32,26 @@ module.exports = function userRoutes(app) {
     try {
       const { email, password } = req.body || {};
 
-      if (!email || !password) {
-        res.status(400).json(
-          new UnifiedResponse("Required fields are missing", 400, false, {
-            error: "email and password are required",
-          }),
-        );
-      }
+      if (!email || !password)
+        return httpResponse(res, 400, {
+          msg: "Required fields are missing",
+          status: false,
+          data: { error: "email and password are required" },
+        });
 
       const user = await register(email, password);
 
-      res
-        .status(201)
-        .json(
-          new UnifiedResponse("Registration successful", 201, true, { user }),
-        );
+      return httpResponse(res, 201, {
+        msg: "Registration successful",
+        status: false,
+        data: { user },
+      });
     } catch (error) {
-      return res.status(500).json(
-        new UnifiedResponse("Registration failed", 500, false, {
-          error: error.message,
-        }),
-      );
+      return httpResponse(res, 500, {
+        msg: "Registration failed",
+        status: false,
+        data: { error: error.message },
+      });
     }
   });
 };

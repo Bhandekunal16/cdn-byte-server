@@ -7,4 +7,10 @@ class UnifiedResponse {
   }
 }
 
-module.exports = UnifiedResponse;
+function httpResponse(response, code, body) {
+  response
+    .status(code)
+    .json(new UnifiedResponse(body.msg, code, body.status, body.data));
+}
+
+module.exports = { UnifiedResponse, httpResponse };

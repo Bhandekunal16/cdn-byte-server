@@ -1,5 +1,5 @@
 const { validateEmail } = require("../enums/regex.enums");
-const UnifiedResponse = require("../core/unified-response");
+const {UnifiedResponse, httpResponse} = require("../core/unified-response");
 const {
   base64Service,
   imageServiceInstance,
@@ -63,11 +63,10 @@ module.exports = function storageRoutes(app) {
           }
         : base64Service(imageBase64, MONGO_IMAGE_MAX_BYTES);
 
-      if (decoded.buffer.length > MONGO_IMAGE_MAX_BYTES) {
+      if (decoded.buffer.length > MONGO_IMAGE_MAX_BYTES)
         return res
           .status(413)
           .json(new UnifiedResponse(size_exceed, 413, false, {}));
-      }
 
       const requestedFormat = req.body?.format;
 
@@ -130,11 +129,10 @@ module.exports = function storageRoutes(app) {
       if (
         error instanceof multer.MulterError &&
         error.code === "LIMIT_FILE_SIZE"
-      ) {
+      )
         return res
           .status(413)
           .json(new UnifiedResponse(size_exceed, 413, false, {}));
-      }
 
       return res
         .status(400)
