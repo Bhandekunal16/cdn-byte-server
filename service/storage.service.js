@@ -4,6 +4,8 @@ const {
   MONGO_IMAGE_MAX_BYTES,
   mongodb,
   storageUsagePipeline,
+  ImageMetaDataPipe,
+  imageDataPipe,
 } = require("../provider/config.map");
 const { getDb } = require("../database/mongoDb.service");
 const MONGO_BSON_LIMIT = 16 * 1024 * 1024;
@@ -25,7 +27,7 @@ class storageService {
 
   async getImageMetaData(email) {
     const collection = await this.collection();
-    return collection.find({ email }, { projection: { image: 0 } }).toArray();
+    return collection.find({ email }, ImageMetaDataPipe).toArray();
   }
 
   async getStorageUsageByEmail() {
@@ -44,23 +46,9 @@ class storageService {
   async readImage(id) {
     const collection = await this.collection();
 
-    const image = await collection.findOne(
-      { _id: id },
-      {
-        projection: {
-          image: 1,
-          mimeType: 1,
-          type: 1,
-          storedSize: 1,
-          checksum: 1,
-          _id: 0,
-        },
-      },
-    );
+    const image = await collection.findOne({ _id: id }, imageDataPipe);
 
-    if (!image) {
-      return undefined;
-    }
+    if (!image) return undefined;
 
     const { mimeType, type, checksum } = image;
     const buffer = asBuffer(image.image);
@@ -77,9 +65,8 @@ class storageService {
     const collection = await this.collection();
     const encoded = document.encoded;
 
-    if (encoded.buffer.length > MONGO_IMAGE_MAX_BYTES) {
+    if (encoded.buffer.length > MONGO_IMAGE_MAX_BYTES)
       throw new Error("Image exceeds the configured MongoDB storage limit");
-    }
 
     const insertDocument = {
       image: encoded.buffer,
@@ -100,9 +87,8 @@ class storageService {
       createdAt: new Date(),
     };
 
-    if (BSON.calculateObjectSize(insertDocument) >= MONGO_BSON_LIMIT) {
+    if (BSON.calculateObjectSize(insertDocument) >= MONGO_BSON_LIMIT)
       throw new Error("Image document exceeds MongoDB's BSON size limit");
-    }
 
     return collection.insertOne(insertDocument);
   }

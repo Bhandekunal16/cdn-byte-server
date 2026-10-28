@@ -16,5 +16,16 @@
       }
     },
     { "$sort": { "totalStoredSize": -1, "email": 1 } }
-  ]
+  ],
+  "ImageMetaDataPipe": { "projection": { "image": 0 } },
+  "imageDataPipe": {
+    "projection": {
+      "image": 1,
+      "mimeType": 1,
+      "type": 1,
+      "storedSize": 1,
+      "checksum": 1,
+      "_id": 0
+    }
+  }
 }
