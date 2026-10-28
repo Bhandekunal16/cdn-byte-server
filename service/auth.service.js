@@ -16,7 +16,6 @@ async function register(email, password) {
   email = normalizeEmail(email);
 
   if (!validateEmail(email)) throw new Error(not_unique);
-
   if (password.length < 8) throw new Error(invalid_length);
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -50,7 +49,6 @@ async function login(email, password) {
       { email },
       { database },
     );
-
 
     if (result.records.length === 0) throw new Error(LOGIN_ERROR.invalid);
     const { passwordHash, id, ...user } = result.records[0].get("user");
