@@ -10,9 +10,7 @@ const { IMAGE_STORAGE, IMAGE_CONFIG } = require("../provider/config.map");
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: {
-    fileSize: IMAGE_STORAGE.MONGO_IMAGE_MAX_BYTES,
-  },
+  limits: { fileSize: IMAGE_STORAGE.MONGO_IMAGE_MAX_BYTES },
 });
 
 const { MONGO_IMAGE_MAX_BYTES } = IMAGE_STORAGE;
