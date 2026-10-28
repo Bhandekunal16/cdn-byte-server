@@ -1,10 +1,10 @@
+const { validateEmail } = require("../enums/regex.enums");
+const UnifiedResponse = require("../core/unified-response");
 const {
   base64Service,
   imageServiceInstance,
   storageServiceInstance,
 } = require("../provider/service.map");
-const { validateEmail } = require("../enums/regex.enums");
-const UnifiedResponse = require("../core/unified-response");
 const { ObjectId, multer } = require("../provider/dependency.map");
 const { IMAGE_STORAGE, IMAGE_CONFIG } = require("../provider/config.map");
 
