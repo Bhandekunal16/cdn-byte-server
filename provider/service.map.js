@@ -6,6 +6,8 @@ const services = {
   storageService: require("../service/storage.service"),
   UnifiedResponse,
   httpResponse,
+  ok: { status: true },
+  failed: { status: false },
 };
 
 module.exports = services;

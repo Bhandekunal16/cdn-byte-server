@@ -1,4 +1,10 @@
-const { login, register, httpResponse } = require("../provider/service.map");
+const {
+  login,
+  register,
+  httpResponse,
+  ok,
+  failed,
+} = require("../provider/service.map");
 
 module.exports = function userRoutes(app) {
   app.post("/login", async (req, res) => {
@@ -8,7 +14,7 @@ module.exports = function userRoutes(app) {
       if (!email || !password)
         return httpResponse(res, 400, {
           msg: "Required fields are missing",
-          status: false,
+          ...failed,
           data: { error: "email and password are required" },
         });
 
@@ -16,14 +22,14 @@ module.exports = function userRoutes(app) {
 
       return httpResponse(res, 200, {
         msg: "Login successful",
-        status: true,
+        ...ok,
         data: { user },
       });
-    } catch (error) {
+    } catch (err) {
       return httpResponse(res, 500, {
         msg: "Login failed",
-        status: false,
-        data: error.message,
+        ...failed,
+        data: err.message,
       });
     }
   });
@@ -35,7 +41,7 @@ module.exports = function userRoutes(app) {
       if (!email || !password)
         return httpResponse(res, 400, {
           msg: "Required fields are missing",
-          status: false,
+          ...failed,
           data: { error: "email and password are required" },
         });
 
@@ -43,14 +49,14 @@ module.exports = function userRoutes(app) {
 
       return httpResponse(res, 201, {
         msg: "Registration successful",
-        status: false,
+        ...ok,
         data: { user },
       });
-    } catch (error) {
+    } catch (err) {
       return httpResponse(res, 500, {
         msg: "Registration failed",
-        status: false,
-        data: { error: error.message },
+        ...failed,
+        data: { error: err.message },
       });
     }
   });
