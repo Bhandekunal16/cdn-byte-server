@@ -1,9 +1,12 @@
 const { validateEmail } = require("../enums/regex.enums");
-const {UnifiedResponse, httpResponse} = require("../core/unified-response");
 const {
   base64Service,
   imageServiceInstance,
   storageServiceInstance,
+  UnifiedResponse,
+  httpResponse,
+  ok,
+  failed,
 } = require("../provider/service.map");
 const { ObjectId, multer } = require("../provider/dependency.map");
 const { IMAGE_STORAGE, IMAGE_CONFIG } = require("../provider/config.map");
@@ -40,21 +43,19 @@ module.exports = function storageRoutes(app) {
       const email = req.body?.email;
 
       if (!imageFile && typeof imageBase64 !== "string")
-        return res
-          .status(400)
-          .json(new UnifiedResponse(required, 400, false, {}));
+        return httpResponse(res, 400, { msg: required, ...failed, data: {} });
 
       if (typeof email !== "string" || !validateEmail(email.trim()))
-        return res
-          .status(400)
-          .json(new UnifiedResponse(not_valid, 400, false, {}));
+        return httpResponse(res, 400, { msg: not_valid, ...failed, data: {} });
 
       const name = imageFile?.originalname || "uploaded-image";
 
       if (imageFile && imageFile.size > MONGO_IMAGE_MAX_BYTES)
-        return res
-          .status(413)
-          .json(new UnifiedResponse(size_exceed, 413, false, {}));
+        return httpResponse(res, 413, {
+          msg: size_exceed,
+          ...failed,
+          data: {},
+        });
 
       const decoded = imageFile
         ? {
@@ -64,9 +65,11 @@ module.exports = function storageRoutes(app) {
         : base64Service(imageBase64, MONGO_IMAGE_MAX_BYTES);
 
       if (decoded.buffer.length > MONGO_IMAGE_MAX_BYTES)
-        return res
-          .status(413)
-          .json(new UnifiedResponse(size_exceed, 413, false, {}));
+        return httpResponse(res, 413, {
+          msg: size_exceed,
+          ...failed,
+          data: {},
+        });
 
       const requestedFormat = req.body?.format;
 
@@ -76,19 +79,19 @@ module.exports = function storageRoutes(app) {
           ? requestedFormat
           : undefined;
 
-      let encoded;
+      let encoded, inserted;
 
       try {
         encoded = await imageServiceInstance.encodeForStorage(decoded.buffer, {
           format,
         });
       } catch {
-        return res
-          .status(400)
-          .json(new UnifiedResponse(unsupported, 400, false, {}));
+        return httpResponse(res, 400, {
+          msg: unsupported,
+          ...failed,
+          data: {},
+        });
       }
-
-      let inserted;
 
       try {
         inserted = await storageServiceInstance.insert({
@@ -97,46 +100,42 @@ module.exports = function storageRoutes(app) {
           name,
         });
       } catch {
-        return res
-          .status(500)
-          .json(new UnifiedResponse(not_be_stored, 500, false, {}));
+        return httpResponse(res, 500, {
+          msg: not_be_stored,
+          ...failed,
+          body: {},
+        });
       }
 
       const success = inserted.acknowledged;
 
-      return res.status(success ? 200 : 500).json(
-        new UnifiedResponse(
-          success ? uploaded : upload_failed,
-          success ? 200 : 500,
-          success,
-          success
-            ? {
-                id: inserted.insertedId,
-                name,
-                mimeType: encoded.mimeType,
-                format: encoded.format,
-                width: encoded.width,
-                height: encoded.height,
-                originalSize: encoded.originalSize,
-                storedSize: encoded.storedSize,
-                optimized: encoded.optimized,
-                checksum: encoded.checksum,
-              }
-            : {},
-        ),
-      );
-    } catch (error) {
-      if (
-        error instanceof multer.MulterError &&
-        error.code === "LIMIT_FILE_SIZE"
-      )
-        return res
-          .status(413)
-          .json(new UnifiedResponse(size_exceed, 413, false, {}));
+      return httpResponse(res, success ? 200 : 500, {
+        msg: success ? uploaded : upload_failed,
+        status: success ? true : false,
+        body: success
+          ? {
+              id: inserted.insertedId,
+              name,
+              mimeType: encoded.mimeType,
+              format: encoded.format,
+              width: encoded.width,
+              height: encoded.height,
+              originalSize: encoded.originalSize,
+              storedSize: encoded.storedSize,
+              optimized: encoded.optimized,
+              checksum: encoded.checksum,
+            }
+          : {},
+      });
+    } catch (err) {
+      if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE")
+        return httpResponse(res, 413, {
+          msg: size_exceed,
+          ...failed,
+          body: {},
+        });
 
-      return res
-        .status(400)
-        .json(new UnifiedResponse(unsupported, 400, false, {}));
+      return httpResponse(res, 400, { msg: unsupported, ...failed, body: {} });
     }
   });
 
