@@ -1,5 +1,4 @@
-const { login, register } = require("../service/auth.service");
-const UnifiedResponse = require("../core/unified-response");
+const { login, register, UnifiedResponse } = require("../provider/service.map");
 
 module.exports = function userRoutes(app) {
   app.post("/login", async (req, res) => {
