@@ -20,11 +20,11 @@ module.exports = function userRoutes(app) {
         ...ok,
         data: { user },
       });
-    } catch (err) {
+    } catch (e) {
       return httpResponse(res, 500, {
         msg: "Login failed",
         ...failed,
-        data: err.message,
+        data: e.message,
       });
     }
   });
@@ -47,11 +47,11 @@ module.exports = function userRoutes(app) {
         ...ok,
         data: { user },
       });
-    } catch (err) {
+    } catch (e) {
       return httpResponse(res, 500, {
         msg: "Registration failed",
         ...failed,
-        data: { error: err.message },
+        data: { error: e.message },
       });
     }
   });

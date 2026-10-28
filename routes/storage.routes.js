@@ -37,9 +37,9 @@ const { not_found, uploaded, upload_failed, found, deleted, failed_to_delete } =
 module.exports = function storageRoutes(app) {
   app.post("/image", upload.single("image"), async (req, res) => {
     try {
-      const imageFile = req.file;
-      const imageBase64 = req.body?.image;
-      const email = req.body?.email;
+      const { file, body } = req;
+      const imageFile = file;
+      const { image: imageBase64, email } = body;
 
       if (!imageFile && typeof imageBase64 !== "string")
         return httpResponse(res, 400, { msg: required, ...failed, data: {} });
@@ -126,8 +126,8 @@ module.exports = function storageRoutes(app) {
             }
           : {},
       });
-    } catch (err) {
-      if (err instanceof multer.MulterError && err.code === "LIMIT_FILE_SIZE")
+    } catch (e) {
+      if (e instanceof multer.MulterError && e.code === "LIMIT_FILE_SIZE")
         return httpResponse(res, 413, {
           msg: size_exceed,
           ...failed,
@@ -196,9 +196,9 @@ module.exports = function storageRoutes(app) {
         ...ok,
         data: images,
       });
-    } catch (error) {
+    } catch (e) {
       return res.headersSent
-        ? next(error)
+        ? next(e)
         : httpResponse(res, 500, {
             msg: failed_to_fetch,
             ...failed,
@@ -245,12 +245,11 @@ module.exports = function storageRoutes(app) {
         ...ok,
         data: deletedCount,
       });
-    } catch (error) {
-      console.error("DELETE /image failed:", error);
+    } catch (e) {
       return httpResponse(res, 500, {
         msg: failed_to_delete,
         ...failed,
-        data: {},
+        data: e.message,
       });
     }
   });
