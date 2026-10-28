@@ -1,6 +1,10 @@
 const asBuffer = require("../core/mongo.functions");
 const { BSON, ObjectId } = require("../provider/dependency.map");
-const { MONGO_IMAGE_MAX_BYTES, mongodb } = require("../provider/config.map");
+const {
+  MONGO_IMAGE_MAX_BYTES,
+  mongodb,
+  storageUsagePipeline,
+} = require("../provider/config.map");
 const { getDb } = require("../database/mongoDb.service");
 const MONGO_BSON_LIMIT = 16 * 1024 * 1024;
 
@@ -8,14 +12,9 @@ class storageService {
   #collectionCache;
 
   async collection() {
-    if (this.#collectionCache) {
-      return this.#collectionCache;
-    }
-
+    if (this.#collectionCache) return this.#collectionCache;
     const db = await getDb();
-
     this.#collectionCache = db.collection(mongodb.DATABASE_COLLECTION.IMAGES);
-
     return this.#collectionCache;
   }
 
@@ -26,41 +25,12 @@ class storageService {
 
   async getImageMetaData(email) {
     const collection = await this.collection();
-
     return collection.find({ email }, { projection: { image: 0 } }).toArray();
   }
 
   async getStorageUsageByEmail() {
     const collection = await this.collection();
-
-    const users = await collection
-      .aggregate([
-        {
-          $group: {
-            _id: "$email",
-            imageCount: { $sum: 1 },
-            totalStoredSize: {
-              $sum: { $ifNull: ["$storedSize", "$size"] },
-            },
-          },
-        },
-        {
-          $project: {
-            _id: 0,
-            email: "$_id",
-            imageCount: 1,
-            totalStoredSize: 1,
-          },
-        },
-        {
-          $sort: {
-            totalStoredSize: -1,
-            email: 1,
-          },
-        },
-      ])
-      .toArray();
-
+    const users = await collection.aggregate(storageUsagePipeline).toArray();
     return {
       users,
       totalImages: users.reduce((total, user) => total + user.imageCount, 0),

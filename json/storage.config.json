@@ -1,0 +1,20 @@
+{
+  "storageUsagePipeline": [
+    {
+      "$group": {
+        "_id": "$email",
+        "imageCount": { "$sum": 1 },
+        "totalStoredSize": { "$sum": { "$ifNull": ["$storedSize", "$size"] } }
+      }
+    },
+    {
+      "$project": {
+        "_id": 0,
+        "email": "$_id",
+        "imageCount": 1,
+        "totalStoredSize": 1
+      }
+    },
+    { "$sort": { "totalStoredSize": -1, "email": 1 } }
+  ]
+}
