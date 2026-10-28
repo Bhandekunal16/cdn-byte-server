@@ -192,24 +192,19 @@ module.exports = function storageRoutes(app) {
       const images = await storageServiceInstance.getImageMetaData(email);
       const success = images.length > 0;
 
-      return res
-        .status(success ? 200 : 404)
-        .json(
-          new UnifiedResponse(
-            success ? found : not_found,
-            success ? 200 : 404,
-            success,
-            images,
-          ),
-        );
+      return httpResponse(res, success ? 200 : 404, {
+        msg: success ? found : not_found,
+        ...ok,
+        data: images,
+      });
     } catch (error) {
-      if (res.headersSent) {
-        return next(error);
-      }
-
-      return res
-        .status(500)
-        .json(new UnifiedResponse(failed_to_fetch, 500, false, []));
+      return res.headersSent
+        ? next(error)
+        : httpResponse(res, 500, {
+            msg: failed_to_fetch,
+            ...failed,
+            data: [],
+          });
     }
   });
 
@@ -217,43 +212,47 @@ module.exports = function storageRoutes(app) {
     try {
       const { ids } = req.body || {};
 
-      if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100) {
-        return res
-          .status(400)
-          .json(new UnifiedResponse(id_required, 400, false, {}));
-      }
+      if (!Array.isArray(ids) || ids.length === 0 || ids.length > 100)
+        return httpResponse(res, 400, {
+          msg: id_required,
+          ...failed,
+          data: {},
+        });
 
       const objectIds = [];
 
       for (const id of ids) {
-        if (typeof id !== "string" || !ObjectId.isValid(id)) {
-          return res
-            .status(400)
-            .json(new UnifiedResponse(id_required, 400, false, {}));
-        }
+        if (typeof id !== "string" || !ObjectId.isValid(id))
+          return httpResponse(res, 400, {
+            msg: id_required,
+            ...failed,
+            data: {},
+          });
 
         objectIds.push(new ObjectId(id));
       }
 
       const { deletedCount } = await storageServiceInstance.delete(objectIds);
 
-      if (deletedCount === 0) {
-        return res
-          .status(404)
-          .json(
-            new UnifiedResponse(not_found, 404, false, { deletedCount: 0 }),
-          );
-      }
+      if (deletedCount === 0)
+        return httpResponse(res, 404, {
+          msg: not_found,
+          ...failed,
+          data: { deletedCount: 0 },
+        });
 
-      return res
-        .status(200)
-        .json(new UnifiedResponse(deleted, 200, true, { deletedCount }));
+      return httpResponse(res, 200, {
+        msg: deleted,
+        ...ok,
+        data: deletedCount,
+      });
     } catch (error) {
       console.error("DELETE /image failed:", error);
-
-      return res
-        .status(500)
-        .json(new UnifiedResponse(failed_to_delete, 500, false, {}));
+      return httpResponse(res, 500, {
+        msg: failed_to_delete,
+        ...failed,
+        data: {},
+      });
     }
   });
 };
