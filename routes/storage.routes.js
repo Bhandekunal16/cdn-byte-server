@@ -1,15 +1,12 @@
 const {
-  storageService,
   base64Service,
-  imageService,
+  imageServiceInstance,
+  storageServiceInstance,
 } = require("../provider/service.map");
 const { validateEmail } = require("../enums/regex.enums");
 const UnifiedResponse = require("../core/unified-response");
 const { ObjectId, multer } = require("../provider/dependency.map");
 const { IMAGE_STORAGE, IMAGE_CONFIG } = require("../provider/config.map");
-
-const codec = new imageService();
-const StorageService = new storageService();
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -88,7 +85,9 @@ module.exports = function storageRoutes(app) {
       let encoded;
 
       try {
-        encoded = await codec.encodeForStorage(decoded.buffer, { format });
+        encoded = await imageServiceInstance.encodeForStorage(decoded.buffer, {
+          format,
+        });
       } catch {
         return res
           .status(400)
@@ -98,7 +97,7 @@ module.exports = function storageRoutes(app) {
       let inserted;
 
       try {
-        inserted = await StorageService.insert({
+        inserted = await storageServiceInstance.insert({
           encoded,
           email: email.trim().toLowerCase(),
           name,
@@ -177,7 +176,7 @@ module.exports = function storageRoutes(app) {
       }
 
       if (id) {
-        const result = await StorageService.readImage(new ObjectId(id));
+        const result = await storageServiceInstance.readImage(new ObjectId(id));
 
         if (!result) {
           return res
@@ -198,7 +197,7 @@ module.exports = function storageRoutes(app) {
           .send(result.buffer);
       }
 
-      const images = await StorageService.getImageMetaData(email);
+      const images = await storageServiceInstance.getImageMetaData(email);
       const success = images.length > 0;
 
       return res
@@ -244,7 +243,7 @@ module.exports = function storageRoutes(app) {
         objectIds.push(new ObjectId(id));
       }
 
-      const { deletedCount } = await StorageService.delete(objectIds);
+      const { deletedCount } = await storageServiceInstance.delete(objectIds);
 
       if (deletedCount === 0) {
         return res
