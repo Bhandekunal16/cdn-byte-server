@@ -1,10 +1,4 @@
-const {
-  login,
-  register,
-  httpResponse,
-  ok,
-  failed,
-} = require("../provider/service.map");
+const { login, register, ok, failed } = require("../provider/service.map");
 const { httpResponse } = require("../core/unified-response.js");
 
 module.exports = function userRoutes(app) {
