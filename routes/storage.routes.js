@@ -149,23 +149,22 @@ module.exports = function storageRoutes(app) {
       const id =
         typeof req.query.id === "string" ? req.query.id.trim() : undefined;
 
-      if ((!email && !id) || (email && id)) {
-        return res
-          .status(400)
-          .json(new UnifiedResponse(email_OR_id_missing, 400, false, []));
-      }
+      if ((!email && !id) || (email && id))
+        return httpResponse(res, 400, {
+          msg: email_OR_id_missing,
+          ...failed,
+          body: [],
+        });
 
-      if (email && !validateEmail(email)) {
-        return res
-          .status(400)
-          .json(new UnifiedResponse(invalid_gmail, 400, false, []));
-      }
+      if (email && !validateEmail(email))
+        return httpResponse(res, 400, {
+          msg: invalid_gmail,
+          ...failed,
+          body: [],
+        });
 
-      if (id && !ObjectId.isValid(id)) {
-        return res
-          .status(400)
-          .json(new UnifiedResponse(invalid_id, 400, false, []));
-      }
+      if (id && !ObjectId.isValid(id))
+        return httpResponse(res, 400, { msg: invalid_id, ...failed, body: [] });
 
       if (id) {
         const result = await storageServiceInstance.readImage(new ObjectId(id));
