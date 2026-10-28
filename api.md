@@ -231,7 +231,7 @@ GET /image?email=person%40gmail.com
 }
 ```
 
-The metadata query excludes the image bytes.
+The metadata query excludes the image bytes using the projection configured in `json/storage.config.json`. The storage service also computes per-email image counts and total stored bytes through an internal aggregation, but no HTTP endpoint exposes that summary.
 
 ### Errors
 

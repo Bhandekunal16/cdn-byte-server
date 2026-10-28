@@ -43,7 +43,7 @@ With the committed settings (`clustering: true`, `REPLICA: true`, `port: 4000`, 
 | `layers/rate.limiting.layer.js` | Maintains an in-memory counter per client address in the proxy process. |
 | `layers/request.id.layer.js` | Reuses or creates a request ID, stores it on the request, and sets the response header. |
 | `proxy/` | Implements upstream request tracking, timeout handling, 502 responses, and client-disconnect cleanup. |
-| `routes/` and `service/` | Implement account and image APIs and their database/business logic. |
+| `routes/` and `service/` | Implement account and image APIs and their database/business logic. The storage service uses configured MongoDB projections and includes an internal storage-usage aggregation helper. |
 | `database/` | Provides MongoDB and Neo4j clients. |
 | `provider/` | Exposes dependencies, merged configuration, and module maps. |
 
@@ -71,6 +71,8 @@ request ID → Helmet → CORS → JSON parser → encryption → request logger
 ```
 
 The root route returns `{ message: "hello world" }`. User routes delegate to `service/auth.service.js`, which normalizes Gmail addresses, hashes passwords with bcrypt, and reads/writes Neo4j `User` nodes. Image routes delegate to the image codec and MongoDB storage service. Image uploads accept multipart files or Base64 JSON data, validate and encode supported images, then persist image bytes and metadata.
+
+The storage service uses `ImageMetaDataPipe` to omit binary data from metadata queries and `imageDataPipe` to select the fields needed when reading an image by ID. Its configured `storageUsagePipeline` groups records by email and reports image count and total stored bytes, falling back from `storedSize` to legacy `size` when needed. This aggregation is currently an internal service helper and is not wired to an HTTP route.
 
 The optional encryption interceptor decrypts JSON request bodies containing `data` and replaces `res.json()` so JSON responses are encrypted as `{ data: "<base64 ciphertext>" }`. Raw image downloads use `res.send()` and are not JSON-wrapped. This is application-level payload transformation, not HTTPS or an authorization mechanism.
 
@@ -102,7 +104,7 @@ The proxy forwards the original method, URL, and headers. It does not generate r
 
 ## Persistence and configuration
 
-`provider/config.map.js` merges `config.json`, `app.json`, `rate-limiting.config.json`, `helmet.config.json`, `logger.config.json`, `database.config.json`, `image.config.json`, and `auth.config.json` in that order. The Helmet configuration is exposed under `helmet`; other files are spread into the merged object. Later values override earlier duplicate keys. Configuration is read at module load, so processes must be restarted after changes.
+`provider/config.map.js` merges `config.json`, `app.json`, `rate-limiting.config.json`, `helmet.config.json`, `logger.config.json`, `database.config.json`, `image.config.json`, `auth.config.json`, and `storage.config.json` in that order. The Helmet configuration is exposed under `helmet`; other files are spread into the merged object. Later values override earlier duplicate keys. Configuration is read at module load, so processes must be restarted after changes.
 
 | File | Contents |
 |---|---|
@@ -114,6 +116,7 @@ The proxy forwards the original method, URL, and headers. It does not generate r
 | `json/database.config.json` | MongoDB and Neo4j connection options, database names, and collection names. |
 | `json/image.config.json` | Supported image formats, input/storage limits, and encoder options. |
 | `json/auth.config.json` | Authentication-related user-facing messages and validation messages. |
+| `json/storage.config.json` | Storage-usage aggregation stages and MongoDB projections for metadata and image reads. |
 
 MongoDB stores image bytes and associated metadata in the configured image collection. Neo4j stores account details, including bcrypt password hashes, in `User` nodes. The services expect externally available databases; Docker Compose does not provision them.
 

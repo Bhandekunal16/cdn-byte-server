@@ -77,6 +77,7 @@ Unmatched routes return JSON 404. The proxy responds with 429 when rate limited,
 6. `json/database.config.json`
 7. `json/image.config.json`
 8. `json/auth.config.json`
+9. `json/storage.config.json`
 
 Later spreads override earlier keys. Modules read configuration when loaded, so restart the relevant process after changing JSON files.
 
@@ -90,6 +91,9 @@ Later spreads override earlier keys. Modules read configuration when loaded, so 
 | `json/database.config.json` | MongoDB and Neo4j connection, database, and collection settings. |
 | `json/image.config.json` | Image formats, size/dimension limits, and encoder behavior. |
 | `json/auth.config.json` | Registration/login messages and validation messages. |
+| `json/storage.config.json` | MongoDB projections for image metadata and image reads, plus the per-email storage-usage aggregation pipeline. |
+
+The storage service uses the metadata projection to omit binary image data from email lookups and a separate projection to fetch image data for downloads. It also provides an internal per-email usage summary (image count and total stored bytes); this helper is not currently exposed as an API endpoint.
 
 The proxy's rate-limit counters are in memory and local to that proxy process. The default configuration permits 100 requests per IP per 900,000 ms (15 minutes).
 
