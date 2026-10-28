@@ -1,6 +1,5 @@
 const { login, register } = require("../service/auth.service");
-const UnifiedResponse  = require("../core/unified-response");
-const { logByte } = require("../provider/dependency.map");
+const UnifiedResponse = require("../core/unified-response");
 
 module.exports = function userRoutes(app) {
   app.post("/login", async (req, res) => {
