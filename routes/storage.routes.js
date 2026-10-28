@@ -103,7 +103,7 @@ module.exports = function storageRoutes(app) {
         return httpResponse(res, 500, {
           msg: not_be_stored,
           ...failed,
-          body: {},
+          data: {},
         });
       }
 
@@ -112,7 +112,7 @@ module.exports = function storageRoutes(app) {
       return httpResponse(res, success ? 200 : 500, {
         msg: success ? uploaded : upload_failed,
         status: success ? true : false,
-        body: success
+        data: success
           ? {
               id: inserted.insertedId,
               name,
@@ -132,10 +132,10 @@ module.exports = function storageRoutes(app) {
         return httpResponse(res, 413, {
           msg: size_exceed,
           ...failed,
-          body: {},
+          data: {},
         });
 
-      return httpResponse(res, 400, { msg: unsupported, ...failed, body: {} });
+      return httpResponse(res, 400, { msg: unsupported, ...failed, data: {} });
     }
   });
 
@@ -153,27 +153,28 @@ module.exports = function storageRoutes(app) {
         return httpResponse(res, 400, {
           msg: email_OR_id_missing,
           ...failed,
-          body: [],
+          data: [],
         });
 
       if (email && !validateEmail(email))
         return httpResponse(res, 400, {
           msg: invalid_gmail,
           ...failed,
-          body: [],
+          data: [],
         });
 
       if (id && !ObjectId.isValid(id))
-        return httpResponse(res, 400, { msg: invalid_id, ...failed, body: [] });
+        return httpResponse(res, 400, { msg: invalid_id, ...failed, data: [] });
 
       if (id) {
         const result = await storageServiceInstance.readImage(new ObjectId(id));
 
-        if (!result) {
-          return res
-            .status(404)
-            .json(new UnifiedResponse(not_found, 404, false, {}));
-        }
+        if (!result)
+          return httpResponse(res, 404, {
+            msg: not_found,
+            ...failed,
+            data: {},
+          });
 
         return res
           .status(200)
