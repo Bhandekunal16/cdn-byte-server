@@ -148,4 +148,4 @@ class storageService {
   }
 }
 
-module.exports = { storageService };
+module.exports = storageService;

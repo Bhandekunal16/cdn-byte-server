@@ -1,7 +1,7 @@
 const ImageCodec = require("../service/image.service");
 const decodeBase64Image = require("../service/base64.service");
-const { UnifiedResponse } = require("../core/unified-response");
-const { storageService } = require("../service/storage.service");
+const UnifiedResponse = require("../core/unified-response");
+const storageService = require("../service/storage.service");
 const { validateEmail } = require("../enums/regex.enums");
 const { ObjectId, multer } = require("../provider/dependency.map");
 const { IMAGE_STORAGE, IMAGE_CONFIG } = require("../provider/config.map");

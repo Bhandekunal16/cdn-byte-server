@@ -7,4 +7,4 @@ class UnifiedResponse {
   }
 }
 
-module.exports = { UnifiedResponse };
+module.exports = UnifiedResponse;
