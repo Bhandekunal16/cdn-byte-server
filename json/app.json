@@ -8,13 +8,13 @@
   "SHUTDOWN_TIMEOUT": 10000,
   "secretKey": "robotic",
   "AUTH_TOKEN_TTL_SECONDS": 43200,
-  "AUTH_TOKEN_SECRET":"b91b937b537facc16225ea385a690f5c449e0a0232e1b8c6f8ec99bcf009495a",
+  "AUTH_TOKEN_SECRET": "b91b937b537facc16225ea385a690f5c449e0a0232e1b8c6f8ec99bcf009495a",
   "ENCODED_KEY": "base64",
   "encryption_algorithm": "aes-256-gcm",
   "algorithm": "sha256",
   "Unicode_Transformation_Format": "utf8",
-   "IV_LENGTH" : 12,
- "AUTH_TAG_LENGTH" : 16,
+  "IV_LENGTH": 12,
+  "AUTH_TAG_LENGTH": 16,
   "randomString": "1234567890123456",
   "replicas": 2
 }
