@@ -1,5 +1,6 @@
 const asBuffer = require("../core/mongo.functions");
 const { BSON, ObjectId } = require("../provider/dependency.map");
+const { createHash } = require("node:crypto");
 const {
   MONGO_IMAGE_MAX_BYTES,
   mongodb,
@@ -13,6 +14,7 @@ const {
 const { getDb } = require("../database/mongoDb.service");
 const MONGO_BSON_LIMIT = 16 * 1024 * 1024;
 const QUOTA_LOCK_COLLECTION = "image_quota_locks";
+const UPLOAD_IDEMPOTENCY_COLLECTION = "image_upload_idempotency";
 
 class StorageAccountingError extends Error {}
 
@@ -24,6 +26,13 @@ class StorageQuotaExceededError extends Error {
     this.quotaBytes = quotaBytes;
     this.availableBytes = Math.max(quotaBytes - usedBytes, 0);
     this.requestedBytes = requestedBytes;
+  }
+}
+
+class IdempotencyKeyConflictError extends Error {
+  constructor() {
+    super("Idempotency key was already used for a different upload");
+    this.name = "IdempotencyKeyConflictError";
   }
 }
 
@@ -149,7 +158,7 @@ class storageService {
     };
   }
 
-  async insert(document, quotaBytes) {
+  async insert(document, quotaBytes, idempotencyKey) {
     const collection = await this.collection();
     const encoded = document.encoded;
 
@@ -182,6 +191,105 @@ class storageService {
     if (!Number.isSafeInteger(quotaBytes) || quotaBytes <= 0)
       throw new StorageAccountingError("Storage quota configuration is invalid");
 
+    if (idempotencyKey !== undefined) {
+      if (
+        typeof idempotencyKey !== "string" ||
+        !/^[A-Za-z0-9._:-]{8,128}$/.test(idempotencyKey)
+      )
+        throw new TypeError("Idempotency key must be 8 to 128 safe characters");
+
+      const database = await getDb();
+      const idempotencyCollection = database.collection(
+        UPLOAD_IDEMPOTENCY_COLLECTION,
+      );
+      const idempotencyId = createHash("sha256")
+        .update(`${document.owner.userId}\0${idempotencyKey}`)
+        .digest("hex");
+      const fingerprint = createHash("sha256")
+        .update(
+          JSON.stringify({
+            checksum:
+              encoded.checksum ??
+              createHash("sha256").update(encoded.buffer).digest("hex"),
+            name: document.name,
+            format: encoded.format,
+            mimeType: encoded.mimeType,
+          }),
+        )
+        .digest("hex");
+
+      return this.withOwnerTransaction(document.owner, async (session) => {
+        const previous = await idempotencyCollection.findOne(
+          { _id: idempotencyId },
+          { session },
+        );
+        if (previous) {
+          if (previous.fingerprint !== fingerprint)
+            throw new IdempotencyKeyConflictError();
+
+          return {
+            acknowledged: true,
+            insertedId: new ObjectId(previous.imageId),
+            idempotencyResult: previous.result,
+            replayed: true,
+          };
+        }
+
+        const { usedBytes } = await this.getStorageUsage(
+          document.owner,
+          session,
+        );
+        if (
+          usedBytes > quotaBytes ||
+          encoded.buffer.length > quotaBytes - usedBytes
+        )
+          throw new StorageQuotaExceededError({
+            usedBytes,
+            quotaBytes,
+            requestedBytes: encoded.buffer.length,
+          });
+
+        const insertedId = new ObjectId();
+        const result = {
+          id: insertedId.toString(),
+          name: document.name,
+          mimeType: encoded.mimeType,
+          format: encoded.format,
+          width: encoded.width,
+          height: encoded.height,
+          originalSize: encoded.originalSize,
+          storedSize: encoded.storedSize,
+          optimized: encoded.optimized,
+          checksum: encoded.checksum,
+        };
+        await collection.insertOne(
+          {
+            ...this.buildImageDocument(document),
+            _id: insertedId,
+          },
+          { session },
+        );
+        await idempotencyCollection.insertOne(
+          {
+            _id: idempotencyId,
+            ownerId: document.owner.userId,
+            idempotencyKey,
+            fingerprint,
+            imageId: insertedId.toString(),
+            result,
+            createdAt: new Date(),
+          },
+          { session },
+        );
+        return {
+          acknowledged: true,
+          insertedId,
+          idempotencyResult: result,
+          replayed: false,
+        };
+      });
+    }
+
     return this.withOwnerTransaction(document.owner, async (session) => {
       const { usedBytes } = await this.getStorageUsage(document.owner, session);
       if (usedBytes > quotaBytes || encoded.buffer.length > quotaBytes - usedBytes)
@@ -192,6 +300,29 @@ class storageService {
         });
       return collection.insertOne(insertDocument, { session });
     });
+  }
+
+  buildImageDocument(document) {
+    const { encoded } = document;
+    return {
+      image: encoded.buffer,
+      email: document.owner.email,
+      ownerId: document.owner.userId,
+      name: document.name,
+      type: encoded.mimeType,
+      size: encoded.storedSize,
+      format: encoded.format,
+      mimeType: encoded.mimeType,
+      width: encoded.width,
+      height: encoded.height,
+      originalSize: encoded.originalSize,
+      storedSize: encoded.storedSize,
+      optimized: encoded.optimized,
+      checksum: encoded.checksum,
+      originalFormat: encoded.originalFormat,
+      originalMimeType: encoded.originalMimeType,
+      createdAt: new Date(),
+    };
   }
 
   async delete(ids, owner) {
@@ -258,4 +389,5 @@ function toSafeNumber(value, description) {
 module.exports = storageService;
 module.exports.StorageAccountingError = StorageAccountingError;
 module.exports.StorageQuotaExceededError = StorageQuotaExceededError;
+module.exports.IdempotencyKeyConflictError = IdempotencyKeyConflictError;
 module.exports.validateStorageConfiguration = validateStorageConfiguration;

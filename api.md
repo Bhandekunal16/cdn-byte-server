@@ -130,11 +130,23 @@ Send `multipart/form-data` with:
 | `email` | No | Optional compatibility field; must match the authenticated account. |
 | `format` | No | Output format: `jpeg`, `png`, `webp`, or `avif`. Defaults to the storage encoder's `webp` format. |
 
+Clients may send an `Idempotency-Key` header containing 8–128 letters, digits, `.`, `_`, `:`, or `-`. Keys are scoped to the authenticated account. Repeating the same key with the same upload returns the original successful result without creating another image or charging quota again. Reusing a key for different upload content returns `409 IDEMPOTENCY_KEY_REUSED`. The image and its idempotency record are committed in the same MongoDB transaction. Idempotency records currently have no expiry and are retained for as long as the account's ledger data is retained.
+
 Example using curl:
 
 ```bash
 curl -X POST http://localhost:8000/image \
   -H 'Authorization: Bearer <accessToken>' \
+  -F 'image=@./picture.png' \
+  -F 'format=webp'
+```
+
+For retry-safe clients, also send a stable key for every logical upload:
+
+```bash
+curl -X POST http://localhost:8000/image \
+  -H 'Authorization: ******' \
+  -H 'Idempotency-Key: 6de102d8-6ab1-48cb-9f38-19d145abea0d' \
   -F 'image=@./picture.png' \
   -F 'format=webp'
 ```
@@ -269,12 +281,13 @@ Returns cloud storage usage for the authenticated account. The default quota is 
     "availableBytes": 1073649479,
     "usagePercentage": 0,
     "imageCount": 1,
-    "warningLevel": "normal"
+    "warningLevel": "normal",
+    "idempotencySupported": true
   }
 }
 ```
 
-`warningLevel` is `normal` below the informational threshold, `info` from 80%, `warning` from 90%, and `full` at 100%. These thresholds are configurable. `availableBytes` never falls below zero and `usagePercentage` is capped at 100.
+`warningLevel` is `normal` below the informational threshold, `info` from 80%, `warning` from 90%, and `full` at 100%. These thresholds are configurable. `availableBytes` never falls below zero and `usagePercentage` is capped at 100. `idempotencySupported` indicates whether this server honors upload idempotency keys; clients must not automatically retry uncertain uploads when this field is missing or false.
 
 ### Errors
 

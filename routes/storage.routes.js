@@ -17,7 +17,10 @@ const {
 const { httpResponse } = require("../core/unified-response.js");
 const requireAuthentication = require("../middleware/auth.middleware");
 const { normalizeEmail } = require("../enums/regex.enums");
-const { StorageQuotaExceededError } = require("../service/storage.service");
+const {
+  StorageQuotaExceededError,
+  IdempotencyKeyConflictError,
+} = require("../service/storage.service");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -71,6 +74,7 @@ module.exports = function storageRoutes(app) {
           usagePercentage,
           imageCount,
           warningLevel: getWarningLevel(usagePercentage),
+          idempotencySupported: true,
         },
       });
     } catch {
@@ -87,6 +91,17 @@ module.exports = function storageRoutes(app) {
       const { file, body } = req;
       const imageFile = file;
       const { image: imageBase64, email } = body;
+      const idempotencyKey = req.get("Idempotency-Key");
+
+      if (
+        idempotencyKey !== undefined &&
+        !/^[A-Za-z0-9._:-]{8,128}$/.test(idempotencyKey)
+      )
+        return httpResponse(res, 400, {
+          msg: "Idempotency-Key must contain 8 to 128 safe characters",
+          status: false,
+          data: { errorCode: "IDEMPOTENCY_KEY_INVALID" },
+        });
 
       if (!imageFile && typeof imageBase64 !== "string")
         return httpResponse(res, 400, { msg: required, ...failed, data: {} });
@@ -151,15 +166,22 @@ module.exports = function storageRoutes(app) {
       }
 
       try {
-        inserted = await storageServiceInstance.insert(
-          {
-            encoded,
-            owner: req.auth,
-            name,
-          },
-          STORAGE_QUOTA_BYTES,
-        );
+        const document = { encoded, owner: req.auth, name };
+        inserted =
+          idempotencyKey === undefined
+            ? await storageServiceInstance.insert(document, STORAGE_QUOTA_BYTES)
+            : await storageServiceInstance.insert(
+                document,
+                STORAGE_QUOTA_BYTES,
+                idempotencyKey,
+              );
       } catch (error) {
+        if (error instanceof IdempotencyKeyConflictError)
+          return httpResponse(res, 409, {
+            msg: error.message,
+            status: false,
+            data: { errorCode: "IDEMPOTENCY_KEY_REUSED" },
+          });
         if (error instanceof StorageQuotaExceededError)
           return httpResponse(res, 409, {
             msg: error.message,
@@ -185,7 +207,7 @@ module.exports = function storageRoutes(app) {
         msg: success ? uploaded : upload_failed,
         status: success ? true : false,
         data: success
-          ? {
+          ? inserted.idempotencyResult ?? {
               id: inserted.insertedId,
               name,
               mimeType: encoded.mimeType,

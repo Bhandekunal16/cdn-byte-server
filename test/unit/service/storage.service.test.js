@@ -22,6 +22,8 @@ const legacyOwnerFilter = {
 describe("storage service image ownership", () => {
   let collection;
   let lockCollection;
+  let idempotencyCollection;
+  let idempotencyRecords;
   let session;
   let db;
 
@@ -42,11 +44,21 @@ describe("storage service image ownership", () => {
       }),
     };
     lockCollection = { updateOne: jest.fn().mockResolvedValue({}) };
+    idempotencyRecords = new Map();
+    idempotencyCollection = {
+      findOne: jest.fn(async ({ _id }) => idempotencyRecords.get(_id) ?? null),
+      insertOne: jest.fn(async (record) => {
+        idempotencyRecords.set(record._id, record);
+        return { acknowledged: true };
+      }),
+    };
     db = {
       client: { startSession: jest.fn(() => session) },
-      collection: jest.fn((name) =>
-        name === "image_quota_locks" ? lockCollection : collection,
-      ),
+      collection: jest.fn((name) => {
+        if (name === "image_quota_locks") return lockCollection;
+        if (name === "image_upload_idempotency") return idempotencyCollection;
+        return collection;
+      }),
     };
     getDb.mockResolvedValue(db);
   });
@@ -166,6 +178,126 @@ describe("storage service image ownership", () => {
     );
 
     expect(collection.insertOne).toHaveBeenCalledTimes(1);
+  });
+
+  it("replays the original upload result without consuming quota twice", async () => {
+    collection.aggregate.mockReturnValue({
+      toArray: jest.fn().mockResolvedValue([]),
+    });
+    const encoded = {
+      buffer: Buffer.from("same-image"),
+      mimeType: "image/webp",
+      format: "webp",
+      storedSize: 10,
+      originalSize: 10,
+      checksum: "same-checksum",
+    };
+    const service = new StorageService();
+    const document = { encoded, owner, name: "photo.webp" };
+
+    const first = await service.insert(document, 100, "operation-1234");
+    const replay = await service.insert(document, 100, "operation-1234");
+
+    expect(first.replayed).toBe(false);
+    expect(replay).toMatchObject({
+      acknowledged: true,
+      insertedId: first.insertedId,
+      idempotencyResult: first.idempotencyResult,
+      replayed: true,
+    });
+    expect(collection.insertOne).toHaveBeenCalledTimes(1);
+    expect(collection.aggregate).toHaveBeenCalledTimes(1);
+    expect(idempotencyCollection.insertOne).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects reuse of an upload idempotency key for different content", async () => {
+    collection.aggregate.mockReturnValue({
+      toArray: jest.fn().mockResolvedValue([]),
+    });
+    const service = new StorageService();
+
+    await service.insert(
+      {
+        encoded: {
+          buffer: Buffer.from("first-image"),
+          mimeType: "image/webp",
+          format: "webp",
+          storedSize: 10,
+          originalSize: 10,
+        },
+        owner,
+        name: "first.webp",
+      },
+      100,
+      "operation-1234",
+    );
+
+    await expect(
+      service.insert(
+        {
+          encoded: {
+            buffer: Buffer.from("different-image"),
+            mimeType: "image/webp",
+            format: "webp",
+            storedSize: 15,
+            originalSize: 15,
+          },
+          owner,
+          name: "different.webp",
+        },
+        100,
+        "operation-1234",
+      ),
+    ).rejects.toMatchObject({ name: "IdempotencyKeyConflictError" });
+    expect(collection.insertOne).toHaveBeenCalledTimes(1);
+  });
+
+  it("serializes concurrent uploads with the same idempotency key", async () => {
+    let transactionTail = Promise.resolve();
+    db.client.startSession.mockImplementation(() => ({
+      withTransaction: async (callback) => {
+        const previous = transactionTail;
+        let release;
+        transactionTail = new Promise((resolve) => {
+          release = resolve;
+        });
+        await previous;
+        try {
+          await callback();
+        } finally {
+          release();
+        }
+      },
+      endSession: jest.fn().mockResolvedValue(undefined),
+    }));
+    collection.aggregate.mockReturnValue({
+      toArray: jest.fn().mockResolvedValue([]),
+    });
+    const service = new StorageService();
+    const document = {
+      encoded: {
+        buffer: Buffer.from("same-image"),
+        mimeType: "image/webp",
+        format: "webp",
+        storedSize: 10,
+        originalSize: 10,
+      },
+      owner,
+      name: "photo.webp",
+    };
+
+    const outcomes = await Promise.all([
+      service.insert(document, 100, "operation-1234"),
+      service.insert(document, 100, "operation-1234"),
+    ]);
+
+    expect(outcomes.map((outcome) => outcome.insertedId.toString())).toEqual([
+      outcomes[0].insertedId.toString(),
+      outcomes[0].insertedId.toString(),
+    ]);
+    expect(collection.insertOne).toHaveBeenCalledTimes(1);
+    expect(idempotencyCollection.insertOne).toHaveBeenCalledTimes(1);
+    expect(collection.aggregate).toHaveBeenCalledTimes(1);
   });
 
   it("serializes concurrent uploads so they cannot consume the same remaining quota", async () => {

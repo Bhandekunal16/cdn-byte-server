@@ -129,6 +129,7 @@ describe("authenticated image routes", () => {
       usagePercentage: 78,
       imageCount: 2,
       warningLevel: "normal",
+      idempotencySupported: true,
     });
     expect(getStorageUsage).toHaveBeenCalledWith(
       expect.objectContaining({ userId: OWNER.userId, email: OWNER.email }),
@@ -222,6 +223,56 @@ describe("authenticated image routes", () => {
       .field("email", OTHER_OWNER.email)
       .attach("image", Buffer.from("image"), "other.png")
       .expect(403);
+  });
+
+  it("passes the idempotency key and returns the original upload response shape", async () => {
+    const idempotencyResult = {
+      id: IMAGE_ID,
+      name: "photo.webp",
+      mimeType: "image/webp",
+      format: "webp",
+      width: 10,
+      height: 10,
+      originalSize: 12,
+      storedSize: 13,
+      optimized: true,
+      checksum: "checksum",
+    };
+    insertImage.mockResolvedValue({
+      acknowledged: true,
+      insertedId: new ObjectId(IMAGE_ID),
+      idempotencyResult,
+      replayed: true,
+    });
+
+    const response = await request(createApp())
+      .post("/image")
+      .set("Authorization", authorization())
+      .set("Idempotency-Key", "operation-1234")
+      .attach("image", Buffer.from("image"), "photo.png")
+      .expect(200);
+
+    expect(response.body.data).toEqual(idempotencyResult);
+    expect(insertImage).toHaveBeenCalledWith(
+      expect.objectContaining({ owner: expect.objectContaining({ userId: OWNER.userId }) }),
+      STORAGE_QUOTA_BYTES,
+      "operation-1234",
+    );
+  });
+
+  it("rejects malformed idempotency keys before processing an upload", async () => {
+    await request(createApp())
+      .post("/image")
+      .set("Authorization", authorization())
+      .set("Idempotency-Key", "bad key")
+      .attach("image", Buffer.from("image"), "photo.png")
+      .expect(400)
+      .expect(({ body }) =>
+        expect(body.data.errorCode).toBe("IDEMPOTENCY_KEY_INVALID"),
+      );
+
+    expect(encodeForStorage).not.toHaveBeenCalled();
+    expect(insertImage).not.toHaveBeenCalled();
   });
 
   it("returns a structured quota rejection distinct from per-file size errors", async () => {
