@@ -109,7 +109,7 @@ The proxy forwards the original method, URL, and headers. It does not generate r
 | File | Contents |
 |---|---|
 | `json/config.json` | Feature switches for middleware, clustering, replicas, rate limiting, and timeouts. |
-| `json/app.json` | Host/ports, replica count, timeout durations, and encryption parameters. |
+| `json/app.json` | Host/ports, replica count, timeout durations, encryption parameters, and access-token lifetime (`AUTH_TOKEN_TTL_SECONDS`). |
 | `json/rate-limiting.config.json` | `windowMs` and `limit`; the custom limiter does not consume the stored header flags. |
 | `json/helmet.config.json` | Options passed to Helmet when configured. |
 | `json/logger.config.json` | Request exclusions and console/file logging switches. |

@@ -1,5 +1,6 @@
 const { bcrypt } = require("../provider/dependency.map");
 const { neo4jDriver } = require("../database/neo4j.service");
+const { issueAccessToken } = require("./access-token.service");
 const {
   normalizeEmail,
   validateEmail,
@@ -14,6 +15,13 @@ const { NEO4J_DATABASE: database } = neo4j;
 const { LOGIN_ERROR } = LOGIN_CONFIG;
 const { REGISTER_ERROR } = REGISTER_CONFIG;
 const { not_unique, invalid_length, already_exits } = REGISTER_ERROR;
+
+class InvalidCredentialsError extends Error {
+  constructor() {
+    super(LOGIN_ERROR.invalid);
+    this.statusCode = 401;
+  }
+}
 
 async function register(email, password) {
   email = normalizeEmail(email);
@@ -42,23 +50,19 @@ async function register(email, password) {
 }
 
 async function login(email, password) {
-  try {
-    email = normalizeEmail(email);
-    const result = await neo4jDriver.executeQuery(
-       `MATCH (u:User {email: $email})
+  email = normalizeEmail(email);
+  const result = await neo4jDriver.executeQuery(
+     `MATCH (u:User {email: $email})
       RETURN u {.id, .email, .passwordHash, .role } AS user
       LIMIT 1`,
-      { email },
-      { database },
-    );
-    if (result.records.length === 0) throw new Error(LOGIN_ERROR.invalid);
-    const { passwordHash, id, ...user } = result.records[0].get("user");
-    const validPassword = await bcrypt.compare(password, passwordHash);
-    if (!validPassword) throw new Error(LOGIN_ERROR.invalid);
-    return { id, email: user.email, role: user.role };
-  } catch (error) {
-    throw new Error(error.message);
-  }
+    { email },
+    { database },
+  );
+  if (result.records.length === 0) throw new InvalidCredentialsError();
+  const { passwordHash, id, ...user } = result.records[0].get("user");
+  const validPassword = await bcrypt.compare(password, passwordHash);
+  if (!validPassword) throw new InvalidCredentialsError();
+  return { id, email: user.email, role: user.role };
 }
 
-module.exports = { login, register };
+module.exports = { InvalidCredentialsError, login, register, issueAccessToken };

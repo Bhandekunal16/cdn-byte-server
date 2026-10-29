@@ -21,6 +21,9 @@ const {
 } = require("./layers/graceful.shutdown.layer");
 const userRoutes = require("./routes/user.routes");
 const storageRoutes = require("./routes/storage.routes");
+const { getTokenConfiguration } = require("./service/access-token.service");
+
+getTokenConfiguration();
 
 if (clustering && cluster.isPrimary) {
   clusterInterceptor();

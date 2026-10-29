@@ -4,7 +4,11 @@ const append = require("../../../core/file.functions");
 
 function loadLogger({ exclude = [], WRITE_L0G = false } = {}) {
   jest.resetModules();
-  jest.doMock("../../../provider/config.map", () => ({ exclude, WRITE_L0G }));
+  jest.doMock("../../../provider/config.map", () => ({
+    exclude,
+    LOG_REQUESTS: true,
+    WRITE_L0G,
+  }));
   jest.mock("../../../core/file.functions", () => jest.fn());
   return require("../../../interceptors/logger.interceptor");
 }
@@ -20,8 +24,8 @@ describe("interceptors/logger.interceptor.js", () => {
     jest.resetModules();
   });
 
-  it("logs request fields and honors exclude list", () => {
-    const logger = loadLogger({ exclude: ["body", "headers"], WRITE_L0G: false });
+  it("omits request bodies and query strings from logs", () => {
+    const logger = loadLogger({ exclude: [], WRITE_L0G: false });
     const req = {
       method: "POST",
       originalUrl: "/x?y=1",
@@ -45,10 +49,11 @@ describe("interceptors/logger.interceptor.js", () => {
 
     const logged = JSON.parse(console.log.mock.calls[0][0].replace(/^request: /, ""));
     expect(logged.method).toBe("POST");
+    expect(logged.url).toBe("/x");
     expect(logged.requestId).toBe("rid-1");
     expect(logged.body).toBeUndefined();
     expect(logged.headers).toBeUndefined();
-    expect(logged.query).toEqual({ y: "1" });
+    expect(logged.query).toBeUndefined();
     expect(next).toHaveBeenCalled();
   });
 

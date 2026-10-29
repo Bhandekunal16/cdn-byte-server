@@ -20,6 +20,8 @@ npm install
 
 The API uses MongoDB for image records and Neo4j for user records. Configure valid database connection details in `json/database.config.json` before using those routes. Keep private credentials out of source control and use appropriate secret management for deployments.
 
+The API requires `AUTH_TOKEN_SECRET`, a high-entropy secret of at least 32 UTF-8 bytes, in the backend process environment. Keep it in your deployment secret manager; do not put it in tracked JSON or a committed `.env` file. Set `AUTH_TOKEN_TTL_SECONDS` in `json/app.json` (default `43200`, accepted range `300`–`604800`). Startup fails if either value is invalid. All backend workers that serve the same deployment must use the same secret. See [the Phase 3 deployment guide](docs/deployment-migration.md).
+
 ## Run locally
 
 Start the backend and proxy in separate terminals:
@@ -51,15 +53,15 @@ The proxy preserves the request method, URL, and headers while forwarding to a b
 |---|---|---|
 | `GET` | `/` | Returns `{ "message": "hello world" }`. |
 | `POST` | `/register` | Creates a user from `email` and `password`. Registration accepts Gmail addresses and requires a password of at least 8 characters. |
-| `POST` | `/login` | Authenticates with `email` and `password`. |
-| `POST` | `/image` | Uploads a multipart file in the `image` field or a Base64 image in the `image` JSON field; both require a Gmail `email`. Optional `format` values are `jpeg`, `png`, `webp`, and `avif`. |
-| `GET` | `/image?id=<id>` | Returns the image bytes for a MongoDB image ID. `download=1` requests attachment disposition. |
-| `GET` | `/image?email=<email>` | Returns image metadata for the supplied Gmail address. |
-| `DELETE` | `/image` | Deletes images using a JSON body containing an `ids` array of 1–100 image IDs. |
+| `POST` | `/login` | Authenticates with `email` and `password`; returns a bearer access token. |
+| `POST` | `/image` | Authenticated upload: multipart `image` or Base64 JSON `image`; optional matching `email`; `format` may be `jpeg`, `png`, `webp`, or `avif`. |
+| `GET` | `/image` | Returns metadata for the authenticated user. |
+| `GET` | `/image?id=<id>` | Returns bytes for an image owned by the authenticated user. `download=1` requests attachment disposition. |
+| `DELETE` | `/image` | Deletes 1–100 owned image IDs from a JSON `ids` array. |
 
 Image uploads are capped at 10 MiB. The image service validates and optimizes supported images before storage, limits dimensions to 1600 pixels, and stores metadata including format, dimensions, sizes, and a SHA-256 checksum. JSON API responses use the `UnifiedResponse` shape (`message`, `statusCode`, `status`, and `data`), except for raw image downloads.
 
-Registration and login use Neo4j and bcrypt password hashes. The API does not issue tokens or create sessions; login success alone does not provide an authorization mechanism for other routes.
+Registration and login use Neo4j and bcrypt password hashes. Login issues a signed, expiring HS256 bearer token. All image routes require that token and enforce image ownership using the stable user ID; legacy records without an owner ID are matched against the verified email. Tokens are stateless and cannot be revoked before expiry; no refresh or logout/revocation endpoint currently exists.
 
 When `encryption_Interceptor` is enabled (the committed default), JSON responses are wrapped as `{ "data": "<base64 ciphertext>" }`. The interceptor also decrypts JSON request bodies containing a `data` field. This payload transformation is not transport security; use HTTPS in deployments.
 
@@ -84,7 +86,7 @@ Later spreads override earlier keys. Modules read configuration when loaded, so 
 | File | Main settings |
 |---|---|
 | `json/config.json` | Feature switches for clustering, replicas, middleware, rate limiting, and proxy timeouts. |
-| `json/app.json` | Bind address, ports, replica count, timeout durations, and encryption parameters. |
+| `json/app.json` | Bind address, ports, replica count, timeout durations, encryption parameters, and access-token lifetime (`AUTH_TOKEN_TTL_SECONDS`). |
 | `json/rate-limiting.config.json` | Per-IP request limit and rate-limit window. The custom layer uses `limit` and `windowMs`. |
 | `json/helmet.config.json` | Options supplied to Helmet. |
 | `json/logger.config.json` | Request-field exclusions and console/file logging switches. |
@@ -95,7 +97,7 @@ Later spreads override earlier keys. Modules read configuration when loaded, so 
 
 The storage service uses the metadata projection to omit binary image data from email lookups and a separate projection to fetch image data for downloads. It also provides an internal per-email usage summary (image count and total stored bytes); this helper is not currently exposed as an API endpoint.
 
-The proxy's rate-limit counters are in memory and local to that proxy process. The default configuration permits 100 requests per IP per 900,000 ms (15 minutes).
+The proxy's rate-limit counters are in memory and local to that proxy process. The default configuration permits 100 requests per IP per 900,000 ms (15 minutes). Deployments must terminate HTTPS at a trusted proxy/load balancer and must not expose the direct backend listener ports publicly.
 
 ## Middleware, logging, and shutdown
 

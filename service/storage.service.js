@@ -10,6 +10,18 @@ const {
 const { getDb } = require("../database/mongoDb.service");
 const MONGO_BSON_LIMIT = 16 * 1024 * 1024;
 
+function ownerFilter(owner) {
+  if (!owner?.userId || !owner?.email)
+    throw new Error("An authenticated image owner is required");
+
+  return {
+    $or: [
+      { ownerId: owner.userId },
+      { ownerId: { $exists: false }, email: owner.email },
+    ],
+  };
+}
+
 class storageService {
   #collectionCache;
 
@@ -20,14 +32,14 @@ class storageService {
     return this.#collectionCache;
   }
 
-  async read(email) {
+  async read(owner) {
     const collection = await this.collection();
-    return collection.find({ email }).toArray();
+    return collection.find(ownerFilter(owner)).toArray();
   }
 
-  async getImageMetaData(email) {
+  async getImageMetaData(owner) {
     const collection = await this.collection();
-    return collection.find({ email }, ImageMetaDataPipe).toArray();
+    return collection.find(ownerFilter(owner), ImageMetaDataPipe).toArray();
   }
 
   async getStorageUsageByEmail() {
@@ -43,10 +55,13 @@ class storageService {
     };
   }
 
-  async readImage(id) {
+  async readImage(id, owner) {
     const collection = await this.collection();
 
-    const image = await collection.findOne({ _id: id }, imageDataPipe);
+    const image = await collection.findOne(
+      { _id: id, ...ownerFilter(owner) },
+      imageDataPipe,
+    );
 
     if (!image) return undefined;
 
@@ -70,7 +85,8 @@ class storageService {
 
     const insertDocument = {
       image: encoded.buffer,
-      email: document.email,
+      email: document.owner.email,
+      ownerId: document.owner.userId,
       name: document.name,
       type: encoded.mimeType,
       size: encoded.storedSize,
@@ -93,13 +109,14 @@ class storageService {
     return collection.insertOne(insertDocument);
   }
 
-  async delete(ids) {
+  async delete(ids, owner) {
     const collection = await this.collection();
 
     return collection.deleteMany({
       _id: {
         $in: ids.map((id) => new ObjectId(id)),
       },
+      ...ownerFilter(owner),
     });
   }
 }

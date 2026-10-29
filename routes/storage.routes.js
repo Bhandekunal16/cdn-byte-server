@@ -9,6 +9,8 @@ const {
 const { ObjectId, multer } = require("../provider/dependency.map");
 const { IMAGE_STORAGE, IMAGE_CONFIG } = require("../provider/config.map");
 const { httpResponse } = require("../core/unified-response.js");
+const requireAuthentication = require("../middleware/auth.middleware");
+const { normalizeEmail } = require("../enums/regex.enums");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -35,7 +37,7 @@ const { not_found, uploaded, upload_failed, found, deleted, failed_to_delete } =
   IMAGE_STATE;
 
 module.exports = function storageRoutes(app) {
-  app.post("/image", upload.single("image"), async (req, res) => {
+  app.post("/image", requireAuthentication, upload.single("image"), async (req, res) => {
     try {
       const { file, body } = req;
       const imageFile = file;
@@ -44,7 +46,18 @@ module.exports = function storageRoutes(app) {
       if (!imageFile && typeof imageBase64 !== "string")
         return httpResponse(res, 400, { msg: required, ...failed, data: {} });
 
-      if (typeof email !== "string" || !validateEmail(email.trim()))
+      if (
+        email !== undefined &&
+        (typeof email !== "string" ||
+          normalizeEmail(email) !== req.auth.email)
+      )
+        return httpResponse(res, 403, {
+          msg: "Image owner does not match the authenticated account",
+          ...failed,
+          data: {},
+        });
+
+      if (!req.auth.userId || !validateEmail(req.auth.email))
         return httpResponse(res, 400, { msg: not_valid, ...failed, data: {} });
 
       const name = imageFile?.originalname || "uploaded-image";
@@ -95,7 +108,7 @@ module.exports = function storageRoutes(app) {
       try {
         inserted = await storageServiceInstance.insert({
           encoded,
-          email: email.trim().toLowerCase(),
+          owner: req.auth,
           name,
         });
       } catch {
@@ -138,17 +151,22 @@ module.exports = function storageRoutes(app) {
     }
   });
 
-  app.get("/image", async (req, res, next) => {
+  app.get("/image", requireAuthentication, async (req, res, next) => {
     try {
-      const email =
-        typeof req.query.email === "string"
-          ? req.query.email.trim().toLowerCase()
-          : undefined;
+      const emailParam = req.query.email;
+      if (emailParam !== undefined && typeof emailParam !== "string")
+        return httpResponse(res, 400, {
+          msg: email_OR_id_missing,
+          ...failed,
+          data: [],
+        });
+
+      const email = typeof emailParam === "string" ? emailParam.trim() : undefined;
 
       const id =
         typeof req.query.id === "string" ? req.query.id.trim() : undefined;
 
-      if ((!email && !id) || (email && id))
+      if (email && id)
         return httpResponse(res, 400, {
           msg: email_OR_id_missing,
           ...failed,
@@ -162,11 +180,21 @@ module.exports = function storageRoutes(app) {
           data: [],
         });
 
+      if (email && normalizeEmail(email) !== req.auth.email)
+        return httpResponse(res, 403, {
+          msg: "Image owner does not match the authenticated account",
+          ...failed,
+          data: [],
+        });
+
       if (id && !ObjectId.isValid(id))
         return httpResponse(res, 400, { msg: invalid_id, ...failed, data: [] });
 
       if (id) {
-        const result = await storageServiceInstance.readImage(new ObjectId(id));
+        const result = await storageServiceInstance.readImage(
+          new ObjectId(id),
+          req.auth,
+        );
 
         if (!result)
           return httpResponse(res, 404, {
@@ -188,7 +216,14 @@ module.exports = function storageRoutes(app) {
           .send(result.buffer);
       }
 
-      const images = await storageServiceInstance.getImageMetaData(email);
+      if (!validateEmail(req.auth.email))
+        return httpResponse(res, 400, {
+          msg: invalid_gmail,
+          ...failed,
+          data: [],
+        });
+
+      const images = await storageServiceInstance.getImageMetaData(req.auth);
       const success = images.length > 0;
 
       return httpResponse(res, success ? 200 : 404, {
@@ -207,7 +242,7 @@ module.exports = function storageRoutes(app) {
     }
   });
 
-  app.delete("/image", async (req, res) => {
+  app.delete("/image", requireAuthentication, async (req, res) => {
     try {
       const { ids } = req.body || {};
 
@@ -231,7 +266,10 @@ module.exports = function storageRoutes(app) {
         objectIds.push(new ObjectId(id));
       }
 
-      const { deletedCount } = await storageServiceInstance.delete(objectIds);
+      const { deletedCount } = await storageServiceInstance.delete(
+        objectIds,
+        req.auth,
+      );
 
       if (deletedCount === 0)
         return httpResponse(res, 404, {

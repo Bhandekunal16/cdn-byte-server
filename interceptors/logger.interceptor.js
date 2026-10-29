@@ -12,16 +12,13 @@ module.exports = function logger(req, _res, next) {
 
   const request = {
     method: req.method,
-    url: req.originalUrl,
+    url: req.path || req.originalUrl?.split("?")[0],
     requestId: req.requestId || req.headers["x-request-id"] || "N/A",
     ip: req.ip,
   };
 
   if (req.params && Object.keys(req.params).length > 0)
     request.params = req.params;
-
-  if (req.query && Object.keys(req.query).length > 0) request.query = req.query;
-  if (req.body && Object.keys(req.body).length > 0) request.body = req.body;
 
   if (hasExclusions) {
     for (const property of exclude) {

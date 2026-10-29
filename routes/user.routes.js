@@ -1,4 +1,9 @@
-const { login, register, ok, failed } = require("../provider/service.map");
+const { login, register } = require("../provider/service.map");
+const {
+  InvalidCredentialsError,
+  issueAccessToken,
+} = require("../service/auth.service");
+const { TokenConfigurationError } = require("../service/access-token.service");
 const { httpResponse } = require("../core/unified-response.js");
 
 module.exports = function userRoutes(app) {
@@ -14,17 +19,31 @@ module.exports = function userRoutes(app) {
         });
 
       const user = await login(email, password);
+      const session = issueAccessToken(user);
 
       return httpResponse(res, 200, {
         msg: "Login successful",
-        ...ok,
-        data: { user },
+        status: true,
+        data: { user, ...session },
       });
     } catch (e) {
-      return httpResponse(res, 500, {
+      const statusCode =
+        e instanceof InvalidCredentialsError
+          ? 401
+          : e instanceof TokenConfigurationError
+            ? 503
+            : 500;
+      return httpResponse(res, statusCode, {
         msg: "Login failed",
-        ...failed,
-        data: e.message,
+        status: false,
+        data: {
+          error:
+            statusCode === 401
+              ? "Invalid email or password"
+              : statusCode === 503
+                ? "Authentication is not configured"
+                : "Authentication failed",
+        },
       });
     }
   });
@@ -44,13 +63,13 @@ module.exports = function userRoutes(app) {
 
       return httpResponse(res, 201, {
         msg: "Registration successful",
-        ...ok,
+        status: true,
         data: { user },
       });
     } catch (e) {
       return httpResponse(res, 500, {
         msg: "Registration failed",
-        ...failed,
+        status: false,
         data: { error: e.message },
       });
     }
