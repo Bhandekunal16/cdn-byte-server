@@ -263,11 +263,11 @@ Deletes between 1 and 100 images by MongoDB ID. This endpoint currently does not
   "message": "Images deleted successfully",
   "statusCode": 200,
   "status": true,
-  "data": {
-    "deletedCount": 2
-  }
+  "data": 2
 }
 ```
+
+`data` is the number of deleted images. If no requested ID matched an image, the endpoint returns `404 Not Found` with `data: {"deletedCount": 0}`.
 
 ### Errors
 
