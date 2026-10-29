@@ -7,10 +7,17 @@ const {
   failed,
 } = require("../provider/service.map");
 const { ObjectId, multer } = require("../provider/dependency.map");
-const { IMAGE_STORAGE, IMAGE_CONFIG } = require("../provider/config.map");
+const {
+  IMAGE_STORAGE,
+  IMAGE_CONFIG,
+  STORAGE_QUOTA_BYTES,
+  STORAGE_WARNING_INFO_PERCENT,
+  STORAGE_WARNING_PROMINENT_PERCENT,
+} = require("../provider/config.map");
 const { httpResponse } = require("../core/unified-response.js");
 const requireAuthentication = require("../middleware/auth.middleware");
 const { normalizeEmail } = require("../enums/regex.enums");
+const { StorageQuotaExceededError } = require("../service/storage.service");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -36,7 +43,45 @@ const {
 const { not_found, uploaded, upload_failed, found, deleted, failed_to_delete } =
   IMAGE_STATE;
 
+function getWarningLevel(usagePercentage) {
+  if (usagePercentage >= 100) return "full";
+  if (usagePercentage >= STORAGE_WARNING_PROMINENT_PERCENT) return "warning";
+  if (usagePercentage >= STORAGE_WARNING_INFO_PERCENT) return "info";
+  return "normal";
+}
+
 module.exports = function storageRoutes(app) {
+  app.get("/storage/usage", requireAuthentication, async (req, res) => {
+    try {
+      const { usedBytes, imageCount } =
+        await storageServiceInstance.getStorageUsage(req.auth);
+      const availableBytes = Math.max(STORAGE_QUOTA_BYTES - usedBytes, 0);
+      const usagePercentage = Math.min(
+        100,
+        Math.round((usedBytes / STORAGE_QUOTA_BYTES) * 100),
+      );
+
+      return httpResponse(res, 200, {
+        msg: "Storage usage retrieved successfully",
+        status: true,
+        data: {
+          usedBytes,
+          quotaBytes: STORAGE_QUOTA_BYTES,
+          availableBytes,
+          usagePercentage,
+          imageCount,
+          warningLevel: getWarningLevel(usagePercentage),
+        },
+      });
+    } catch {
+      return httpResponse(res, 500, {
+        msg: "Could not reliably calculate storage usage",
+        status: false,
+        data: { errorCode: "STORAGE_USAGE_UNAVAILABLE" },
+      });
+    }
+  });
+
   app.post("/image", requireAuthentication, upload.single("image"), async (req, res) => {
     try {
       const { file, body } = req;
@@ -106,12 +151,27 @@ module.exports = function storageRoutes(app) {
       }
 
       try {
-        inserted = await storageServiceInstance.insert({
-          encoded,
-          owner: req.auth,
-          name,
-        });
-      } catch {
+        inserted = await storageServiceInstance.insert(
+          {
+            encoded,
+            owner: req.auth,
+            name,
+          },
+          STORAGE_QUOTA_BYTES,
+        );
+      } catch (error) {
+        if (error instanceof StorageQuotaExceededError)
+          return httpResponse(res, 409, {
+            msg: error.message,
+            status: false,
+            data: {
+              errorCode: "STORAGE_QUOTA_EXCEEDED",
+              usedBytes: error.usedBytes,
+              quotaBytes: error.quotaBytes,
+              availableBytes: error.availableBytes,
+              requestedBytes: error.requestedBytes,
+            },
+          });
         return httpResponse(res, 500, {
           msg: not_be_stored,
           ...failed,

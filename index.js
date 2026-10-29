@@ -22,8 +22,10 @@ const {
 const userRoutes = require("./routes/user.routes");
 const storageRoutes = require("./routes/storage.routes");
 const { getTokenConfiguration } = require("./service/access-token.service");
+const { validateStorageConfiguration } = require("./service/storage.service");
 
 getTokenConfiguration();
+validateStorageConfiguration();
 
 if (clustering && cluster.isPrimary) {
   clusterInterceptor();

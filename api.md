@@ -183,9 +183,10 @@ For Base64 uploads, the stored name is `uploaded-image`.
 | `400` | Authenticated account identity is invalid | `A valid Gmail address is required` |
 | `400` | Image data or image format is invalid/unsupported | `Invalid or unsupported image` |
 | `413` | File or decoded payload exceeds 10 MiB | `Image exceeds the configured size limit` |
+| `409` | The upload would exceed the account's cloud storage quota | `Account cloud storage quota exceeded`, with `data.errorCode` set to `STORAGE_QUOTA_EXCEEDED` and current usage details |
 | `500` | Storage insert fails | `Image could not be stored` |
 
-Image-processing exceptions are returned as `400`; database insert failures are returned as `500`.
+Image-processing exceptions are returned as `400`; database insert failures or unreliable quota accounting are returned as `500`.
 
 ## `GET /image`
 
@@ -239,7 +240,7 @@ GET /image
 }
 ```
 
-The metadata query excludes image bytes using the projection configured in `json/storage.config.json`. The storage service also computes image counts and total stored bytes through an internal aggregation, but no HTTP endpoint exposes that summary.
+The metadata query excludes image bytes using the projection configured in `json/storage.config.json`.
 
 ### Errors
 
@@ -250,6 +251,39 @@ The metadata query excludes image bytes using the projection configured in `json
 | `403` | Optional email does not match the token identity | Ownership mismatch response. |
 | `404` | No matching image exists, or an email has no stored images | Error response with `Image not found`. |
 | `500` | Database/read operation fails | Error response with `Failed to fetch images`. |
+
+## `GET /storage/usage`
+
+Returns cloud storage usage for the authenticated account. The default quota is 1 GiB per account; change `STORAGE_QUOTA_BYTES` and the warning thresholds in `json/storage.config.json` to configure it. Usage includes each owned image's `storedSize`, falling back to legacy `size` when needed. If a stored image has neither a valid size nor a valid legacy size, the endpoint fails rather than reporting an understated total.
+
+### Success — `200 OK`
+
+```json
+{
+  "message": "Storage usage retrieved successfully",
+  "statusCode": 200,
+  "status": true,
+  "data": {
+    "usedBytes": 102345,
+    "quotaBytes": 1073741824,
+    "availableBytes": 1073649479,
+    "usagePercentage": 0,
+    "imageCount": 1,
+    "warningLevel": "normal"
+  }
+}
+```
+
+`warningLevel` is `normal` below the informational threshold, `info` from 80%, `warning` from 90%, and `full` at 100%. These thresholds are configurable. `availableBytes` never falls below zero and `usagePercentage` is capped at 100.
+
+### Errors
+
+| HTTP status | Condition | Result |
+|---|---|---|
+| `401` | Missing, invalid, or expired bearer token | Authentication error response |
+| `500` | Usage cannot be calculated reliably | `data.errorCode` is `STORAGE_USAGE_UNAVAILABLE` |
+
+Uploads and deletes use MongoDB transactions to keep quota checks consistent. MongoDB must use a transaction-capable topology (such as a replica set); standalone servers cannot perform these writes.
 
 ## `DELETE /image`
 

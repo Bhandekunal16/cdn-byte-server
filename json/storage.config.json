@@ -1,10 +1,71 @@
 {
+  "STORAGE_QUOTA_BYTES": 1073741824,
+  "STORAGE_WARNING_INFO_PERCENT": 80,
+  "STORAGE_WARNING_PROMINENT_PERCENT": 90,
   "storageUsagePipeline": [
+    {
+      "$set": {
+        "_usageBytes": {
+          "$let": {
+            "vars": {
+              "stored": {
+                "$convert": {
+                  "input": "$storedSize",
+                  "to": "long",
+                  "onError": null,
+                  "onNull": null
+                }
+              }
+            },
+            "in": {
+              "$cond": [
+                {
+                  "$and": [
+                    { "$ne": ["$$stored", null] },
+                    { "$gte": ["$$stored", 0] }
+                  ]
+                },
+                "$$stored",
+                {
+                  "$let": {
+                    "vars": {
+                      "legacy": {
+                        "$convert": {
+                          "input": "$size",
+                          "to": "long",
+                          "onError": null,
+                          "onNull": null
+                        }
+                      }
+                    },
+                    "in": {
+                      "$cond": [
+                        {
+                          "$and": [
+                            { "$ne": ["$$legacy", null] },
+                            { "$gte": ["$$legacy", 0] }
+                          ]
+                        },
+                        "$$legacy",
+                        null
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
     {
       "$group": {
         "_id": "$email",
         "imageCount": { "$sum": 1 },
-        "totalStoredSize": { "$sum": { "$ifNull": ["$storedSize", "$size"] } }
+        "totalStoredSize": { "$sum": { "$ifNull": ["$_usageBytes", 0] } },
+        "invalidSizeCount": {
+          "$sum": { "$cond": [{ "$eq": ["$_usageBytes", null] }, 1, 0] }
+        }
       }
     },
     {
@@ -12,7 +73,8 @@
         "_id": 0,
         "email": "$_id",
         "imageCount": 1,
-        "totalStoredSize": 1
+        "totalStoredSize": 1,
+        "invalidSizeCount": 1
       }
     },
     { "$sort": { "totalStoredSize": -1, "email": 1 } }

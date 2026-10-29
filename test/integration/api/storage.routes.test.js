@@ -5,6 +5,12 @@ const ImageCodec = require("../../../service/image.service");
 const StorageService = require("../../../service/storage.service");
 const { issueAccessToken } = require("../../../service/access-token.service");
 const { ObjectId } = require("../../../provider/dependency.map");
+const {
+  StorageQuotaExceededError,
+} = require("../../../service/storage.service");
+const {
+  STORAGE_QUOTA_BYTES,
+} = require("../../../provider/config.map");
 const storageRoutes = require("../../../routes/storage.routes");
 const errorInterceptor = require("../../../interceptors/error.interceptor");
 
@@ -18,6 +24,7 @@ describe("authenticated image routes", () => {
   let deleteImages;
   let encodeForStorage;
   let insertImage;
+  let getStorageUsage;
 
   beforeEach(() => {
     readImage = jest
@@ -33,6 +40,12 @@ describe("authenticated image routes", () => {
     getImageMetaData = jest
       .spyOn(StorageService.prototype, "getImageMetaData")
       .mockResolvedValue([{ _id: IMAGE_ID, name: "photo.jpg" }]);
+    getStorageUsage = jest
+      .spyOn(StorageService.prototype, "getStorageUsage")
+      .mockImplementation(async (owner) => ({
+        imageCount: owner.userId === OWNER.userId ? 2 : 0,
+        usedBytes: owner.userId === OWNER.userId ? 838860800 : 0,
+      }));
     deleteImages = jest
       .spyOn(StorageService.prototype, "delete")
       .mockImplementation(async (_ids, owner) => ({
@@ -98,6 +111,28 @@ describe("authenticated image routes", () => {
     expect(readImage).not.toHaveBeenCalled();
     expect(deleteImages).not.toHaveBeenCalled();
     expect(encodeForStorage).not.toHaveBeenCalled();
+  });
+
+  it("requires authentication and reports only the authenticated account's storage usage", async () => {
+    const app = createApp();
+    await request(app).get("/storage/usage").expect(401);
+
+    const response = await request(app)
+      .get("/storage/usage?email=other%40gmail.com")
+      .set("Authorization", authorization())
+      .expect(200);
+
+    expect(response.body.data).toEqual({
+      usedBytes: 838860800,
+      quotaBytes: STORAGE_QUOTA_BYTES,
+      availableBytes: STORAGE_QUOTA_BYTES - 838860800,
+      usagePercentage: 78,
+      imageCount: 2,
+      warningLevel: "normal",
+    });
+    expect(getStorageUsage).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: OWNER.userId, email: OWNER.email }),
+    );
   });
 
   it("rejects invalid and expired bearer tokens consistently", async () => {
@@ -178,6 +213,7 @@ describe("authenticated image routes", () => {
           email: OWNER.email,
         }),
       }),
+      STORAGE_QUOTA_BYTES,
     );
 
     await request(createApp())
@@ -186,6 +222,30 @@ describe("authenticated image routes", () => {
       .field("email", OTHER_OWNER.email)
       .attach("image", Buffer.from("image"), "other.png")
       .expect(403);
+  });
+
+  it("returns a structured quota rejection distinct from per-file size errors", async () => {
+    insertImage.mockRejectedValue(
+      new StorageQuotaExceededError({
+        usedBytes: STORAGE_QUOTA_BYTES - 1,
+        quotaBytes: STORAGE_QUOTA_BYTES,
+        requestedBytes: 2,
+      }),
+    );
+
+    const response = await request(createApp())
+      .post("/image")
+      .set("Authorization", authorization())
+      .attach("image", Buffer.from("image"), "photo.png")
+      .expect(409);
+
+    expect(response.body.data).toEqual({
+      errorCode: "STORAGE_QUOTA_EXCEEDED",
+      usedBytes: STORAGE_QUOTA_BYTES - 1,
+      quotaBytes: STORAGE_QUOTA_BYTES,
+      availableBytes: 1,
+      requestedBytes: 2,
+    });
   });
 
   it("restricts deletion to the authenticated owner", async () => {
