@@ -17,19 +17,19 @@ The API uses Neo4j for user records and MongoDB for image records. Runtime setti
                        │           │
                 index.js         proxy.js
                    │                 │
-          cluster primary?       :8000 listener
+          cluster primary?       :proxyPort listener
                    │                 │
        one worker per CPU       rate-limit layer
                    │                 │
        replica layer creates   next backend port
-       :4000 … :4003                │
+       :port … :port+replicas-1     │
                    └──── Express API ┘
                       │          │
                    Neo4j      MongoDB
                  user data   image data
 ```
 
-With the committed settings (`clustering: true`, `REPLICA: true`, `port: 4000`, `replicas: 4`), the primary forks one worker per CPU. Every worker invokes the replica layer for ports 4000–4003. Node's cluster machinery shares listener handles for a given port; workers do not receive unique port ranges.
+With the committed settings (`clustering: true`, `REPLICA: true`, `port: 4002`, `replicas: 2`, `proxyPort: 8001`), the primary forks one worker per CPU. Every worker invokes the replica layer for ports 4002–4003. Node's cluster machinery shares listener handles for a given port; workers do not receive unique port ranges.
 
 ## Entry points and components
 
@@ -72,7 +72,7 @@ request ID → Helmet → CORS → JSON parser → encryption → request logger
 
 The root route returns `{ message: "hello world" }`. User routes delegate to `service/auth.service.js`, which normalizes Gmail addresses, hashes passwords with bcrypt, and reads/writes Neo4j `User` nodes. Image routes delegate to the image codec and MongoDB storage service. Image uploads accept multipart files or Base64 JSON data, validate and encode supported images, then persist image bytes and metadata.
 
-The storage service uses `ImageMetaDataPipe` to omit binary data from metadata queries and `imageDataPipe` to select the fields needed when reading an image by ID. Its configured `storageUsagePipeline` groups records by email and reports image count and total stored bytes, falling back from `storedSize` to legacy `size` when needed. This aggregation is currently an internal service helper and is not wired to an HTTP route.
+The storage service uses `ImageMetaDataPipe` to omit binary data from metadata queries and `imageDataPipe` to select the fields needed when reading an image by ID. Its configured `storageUsagePipeline` groups records by email and reports image count and total stored bytes, falling back from `storedSize` to legacy `size` when needed. `routes/storage.routes.js` exposes this aggregation at authenticated `GET /storage/usage` with quota and warning metadata.
 
 The optional encryption interceptor decrypts JSON request bodies containing `data` and replaces `res.json()` so JSON responses are encrypted as `{ data: "<base64 ciphertext>" }`. Raw image downloads use `res.send()` and are not JSON-wrapped. This is application-level payload transformation, not HTTPS or an authorization mechanism.
 
@@ -130,6 +130,6 @@ On `SIGTERM` or `SIGINT`, the proxy or API server stops accepting connections an
 
 ## Deployment and constraints
 
-`app.process.sh` launches the API and proxy for local/container use. Docker exposes ports `8000` and `4000`–`4003`, but `docker-compose.yml` currently refers to lowercase `dockerfile` while the tracked Docker definition is named `dockerFile`; this mismatch prevents the Compose build on case-sensitive filesystems until corrected.
+`app.process.sh` launches the API and proxy for local/container use. Docker Compose publishes `8001`, `4002`, and `4003` in the committed file, but `docker-compose.yml` currently refers to lowercase `dockerfile` while the tracked Docker definition is named `dockerFile`; this mismatch prevents the Compose build on case-sensitive filesystems until corrected.
 
-This is a demo-oriented HTTP service. It has no TLS termination, authorization/session/token layer, shared rate-limit store, retry policy, or durable application log store. Protect database credentials and encryption configuration, and provide HTTPS and appropriate access controls in a deployment.
+This is a demo-oriented HTTP service. Image routes require signed bearer access tokens, but the service still has no TLS termination, refresh or revocation endpoints, shared rate-limit store, retry policy, or durable application log store. Protect database credentials, token signing secrets, and encryption configuration, and provide HTTPS and appropriate access controls in a deployment.

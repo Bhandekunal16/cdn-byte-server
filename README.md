@@ -8,7 +8,7 @@ A CommonJS Node.js service that combines an Express API, a Node.js HTTP reverse 
 - `proxy.js` starts the client-facing reverse proxy. It forwards requests to backend ports in round-robin order.
 - `layers/replica.layer.js` creates one backend listener, or `replicas` consecutive listeners, according to `REPLICA`.
 
-With the committed app configuration, the proxy listens on port `8000` and the backend ports are `4000`–`4003`. When clustering is enabled, cluster workers share those configured listeners; they do not each receive a separate port range.
+With the committed `json/app.json` settings, the proxy listens on `proxyPort` `8001` and the backend ports are `4002`–`4003` (`port` `4002`, `replicas` `2`). When clustering is enabled, cluster workers share those configured listeners; they do not each receive a separate port range.
 
 ## Requirements and installation
 
@@ -42,7 +42,7 @@ The script starts both processes in the background and sends `SIGTERM` to both i
 Send requests through the proxy:
 
 ```bash
-curl http://localhost:8000/
+curl http://localhost:8001/
 ```
 
 The proxy preserves the request method, URL, and headers while forwarding to a backend. Direct requests to a backend port bypass proxy-only rate limiting and proxy timeout handling.
@@ -57,13 +57,14 @@ The proxy preserves the request method, URL, and headers while forwarding to a b
 | `POST` | `/image` | Authenticated upload: multipart `image` or Base64 JSON `image`; optional matching `email`; `format` may be `jpeg`, `png`, `webp`, or `avif`. |
 | `GET` | `/image` | Returns metadata for the authenticated user. |
 | `GET` | `/image?id=<id>` | Returns bytes for an image owned by the authenticated user. `download=1` requests attachment disposition. |
+| `GET` | `/storage/usage` | Returns authenticated cloud storage usage, quota, warning level, and idempotency support for the account. |
 | `DELETE` | `/image` | Deletes 1–100 owned image IDs from a JSON `ids` array. |
 
 Image uploads are capped at 10 MiB. The image service validates and optimizes supported images before storage, limits dimensions to 1600 pixels, and stores metadata including format, dimensions, sizes, and a SHA-256 checksum. JSON API responses use the `UnifiedResponse` shape (`message`, `statusCode`, `status`, and `data`), except for raw image downloads.
 
 Registration and login use Neo4j and bcrypt password hashes. Login issues a signed, expiring HS256 bearer token. All image routes require that token and enforce image ownership using the stable user ID; legacy records without an owner ID are matched against the verified email. Tokens are stateless and cannot be revoked before expiry; no refresh or logout/revocation endpoint currently exists.
 
-When `encryption_Interceptor` is enabled (the committed default), JSON responses are wrapped as `{ "data": "<base64 ciphertext>" }`. The interceptor also decrypts JSON request bodies containing a `data` field. This payload transformation is not transport security; use HTTPS in deployments.
+When `encryption_Interceptor` is enabled in `json/config.json`, JSON responses are wrapped as `{ "data": "<base64 ciphertext>" }`. The interceptor also decrypts JSON request bodies containing a `data` field. The committed configuration keeps this switch off; enable it only when clients are configured to match. This payload transformation is not transport security; use HTTPS in deployments.
 
 Unmatched routes return JSON 404. The proxy responds with 429 when rate limited, 502 for upstream errors, 504 for enabled upstream timeouts, and 503 while shutting down.
 
@@ -95,7 +96,7 @@ Later spreads override earlier keys. Modules read configuration when loaded, so 
 | `json/auth.config.json` | Registration/login messages and validation messages. |
 | `json/storage.config.json` | MongoDB projections for image metadata and image reads, plus the per-email storage-usage aggregation pipeline. |
 
-The storage service uses the metadata projection to omit binary image data from email lookups and a separate projection to fetch image data for downloads. It also provides an internal per-email usage summary (image count and total stored bytes); this helper is not currently exposed as an API endpoint.
+The storage service uses the metadata projection to omit binary image data from email lookups and a separate projection to fetch image data for downloads. The same usage aggregation powers the authenticated `GET /storage/usage` route (quota, warning level, and idempotency capability).
 
 The proxy's rate-limit counters are in memory and local to that proxy process. The default configuration permits 100 requests per IP per 900,000 ms (15 minutes). Deployments must terminate HTTPS at a trusted proxy/load balancer and must not expose the direct backend listener ports publicly.
 
@@ -119,7 +120,7 @@ The repository includes `dockerFile`, `docker-compose.yml`, and `docker.process.
 bash docker.process.sh proxy-server 1.0.0
 ```
 
-`docker-compose.yml` currently names the build file `dockerfile` (lowercase), while the tracked file is `dockerFile`. These names differ on case-sensitive filesystems, so the Compose build setting must be aligned before this workflow will work there. The Compose service publishes port `8000` and backend ports `4000`–`4003`, and mounts `./logs` at `/app/logs`; MongoDB and Neo4j are external dependencies and are not defined by Compose.
+`docker-compose.yml` currently names the build file `dockerfile` (lowercase), while the tracked file is `dockerFile`. These names differ on case-sensitive filesystems, so the Compose build setting must be aligned before this workflow will work there. The Compose service publishes `8001`, `4002`, and `4003` (aligned with the committed app ports), and mounts `./logs` at `/app/logs`; MongoDB and Neo4j are external dependencies and are not defined by Compose.
 
 ## Tests
 

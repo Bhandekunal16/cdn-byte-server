@@ -1,6 +1,6 @@
 # API Reference
 
-The Express API is intended to be accessed through the reverse proxy. Local development may use `http://localhost:8000`; deployments must expose it through HTTPS and keep direct backend ports private.
+The Express API is intended to be accessed through the reverse proxy. Local development may use `http://localhost:8001` with the committed `json/app.json` `proxyPort`; deployments must expose it through HTTPS and keep direct backend ports private.
 
 All examples use JSON unless noted otherwise. `POST /register` and `POST /login` are public. Every `/image` route requires a bearer token returned by login; image ownership is derived from the verified token rather than a caller-selected email.
 
@@ -135,7 +135,7 @@ Clients may send an `Idempotency-Key` header containing 8–128 letters, digits,
 Example using curl:
 
 ```bash
-curl -X POST http://localhost:8000/image \
+curl -X POST http://localhost:8001/image \
   -H 'Authorization: Bearer <accessToken>' \
   -F 'image=@./picture.png' \
   -F 'format=webp'
@@ -144,7 +144,7 @@ curl -X POST http://localhost:8000/image \
 For retry-safe clients, also send a stable key for every logical upload:
 
 ```bash
-curl -X POST http://localhost:8000/image \
+curl -X POST http://localhost:8001/image \
   -H 'Authorization: ******' \
   -H 'Idempotency-Key: 6de102d8-6ab1-48cb-9f38-19d145abea0d' \
   -F 'image=@./picture.png' \
@@ -318,7 +318,7 @@ Send `Authorization: Bearer <accessToken>` as an HTTP header:
 Example:
 
 ```bash
-curl -X DELETE http://localhost:8000/image \
+curl -X DELETE http://localhost:8001/image \
   -H 'Authorization: Bearer <accessToken>' \
   -H 'Content-Type: application/json' \
   -d '{"ids":["mongodb-object-id-1"]}'
