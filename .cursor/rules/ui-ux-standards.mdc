@@ -1,0 +1,52 @@
+---
+description: UI/UX design standards for PixelVault screens and Compose components
+globs: PixelVault/**/*
+alwaysApply: false
+---
+
+# UI/UX Design Standards & Principles
+
+When designing, developing, improving, or refactoring any screen or component in PixelVault, follow these principles and rules.
+
+## Core laws (apply where relevant)
+
+1. **Hick's Law** — Minimize unnecessary choices; group related actions; prioritize primary actions; use progressive disclosure; avoid option overload.
+2. **Fitts's Law** — Large enough touch targets (~40dp+ for icon actions); adequate spacing between tappable elements; place frequent actions in reachable, familiar locations; mobile-first.
+3. **Jakob's Law** — Use familiar patterns (Material 3, standard icons, consistent nav/buttons/cards/dialogs); similar components behave the same app-wide.
+4. **Miller's Law** — Chunk information; clear headings and hierarchy; avoid showing everything at once; show info at the right step in the flow.
+5. **Gestalt (proximity)** — Group related UI; separate sections with spacing; label+control pairing; consistent alignment and whitespace.
+6. **Aesthetic-usability** — Clean, modern, professional; consistent tokens (color, type, spacing, radii); minimal borders/shadows/decoration; clear interaction feedback; never sacrifice accessibility for looks.
+
+## Visual consistency
+
+- Use the existing design system (`MaterialTheme`, `Color.kt`, shared components under `ui/components/`).
+- Reuse components; avoid duplicate one-off patterns.
+- Match behavior and appearance across Profile, Home, Images, Upload, Detail, etc.
+
+## Responsive & mobile
+
+- Mobile-first; comfortable touch; no horizontal overflow or overlapping chrome; limit unnecessary scroll depth.
+
+## Accessibility
+
+- Sufficient contrast; `contentDescription` / semantics for controls; status not by color alone; visible disabled, loading, selected, and focus states where applicable.
+
+## Interaction design
+
+- Immediate feedback (haptics where already used); loading for async work; meaningful empty/success/error states; confirm destructive actions; predictable flows.
+
+## Implementation rules
+
+1. Read existing screen layout, state, and patterns before changing UI.
+2. Fix usability issues; don't change visuals alone without purpose.
+3. Prefer reusable composables over copy-paste.
+4. Preserve ViewModels, repositories, APIs, and persistence — no unnecessary backend changes.
+5. Scope changes to the requested screen; don't redesign unrelated areas.
+6. Every interactive element must work; not decorative.
+7. Verify responsiveness and consistency after changes.
+
+## Final quality check
+
+Before marking UI work complete, confirm: primary action obvious; targets easy to hit; familiar patterns; grouped information; clear hierarchy; app-wide consistency; accessibility/responsive OK; **all prior functionality preserved**.
+
+**Objective:** Intuitive, accessible, consistent, polished, efficient interfaces. Treat principles as practical guidelines, not checkbox theater.
